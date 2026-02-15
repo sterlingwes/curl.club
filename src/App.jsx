@@ -30,6 +30,7 @@ function createRock(team, id) {
     inPlay: false, // M2B47
     active: false, // M2BD4
     stopped: false,
+    hasContacted: false, // true if this rock has hit another rock (for hog line rule)
   };
 }
 
@@ -86,12 +87,15 @@ function safeAsin(v) {
 }
 
 // --- Game dimensions (in "world" units, rendered to canvas) ---
+// A real curling sheet is ~15ft wide, 12ft house = ~80% of width.
+// Our 12ft ring radius = 72, so half-width = ~82 (about 10 units / ~1.5ft clearance per side)
 const WORLD = {
-  sheetWidth: 160, // cross-sheet (y range roughly -80 to 80)
+  sheetHalfWidth: 82, // cross-sheet half-width (y range -82 to 82)
   sheetLength: 900, // along-sheet visible length
-  hogLine: -380, // hog line position
-  tLine: -540, // tee line
-  backLine: -600, // back line
+  hogLine: -380, // near hog line (delivery side)
+  farHogLine: -200, // far hog line (not actively used but drawn)
+  tLine: -540, // tee line (center of house)
+  backLine: -612, // back line (far edge of house: tee - 12ft ring)
   hackPos: -100, // hack (delivery) position
   houseCenter: { x: -540, y: 0 },
   houseRadii: [6, 24, 48, 72], // button, 4ft, 8ft, 12ft rings
@@ -156,40 +160,55 @@ export default function CurlingGame() {
         const minDist = ROCK_RADIUS * 2;
 
         if (dist < minDist && dist > 0) {
-          // Collision angle
-          const collAngle = Math.atan2(b.y - a.y, b.x - a.x);
-          const relAngle = Math.abs(Math.sin(collAngle - a.angle));
-          const parAngle = Math.abs(Math.cos(collAngle - a.angle));
           const restitution = RESTITUTION[0];
 
-          // Transfer velocity
-          b.velocity = a.velocity * parAngle * restitution;
-          a.velocity = a.velocity * relAngle * restitution;
+          // Collision normal (from a to b)
+          const nx = (b.x - a.x) / dist;
+          const ny = (b.y - a.y) / dist;
 
-          b.angle = collAngle;
-          if (a.angle < PI / 2 && collAngle > (3 * PI) / 2) {
-            a.angle = collAngle + PI / 2;
-          } else if (a.angle > collAngle) {
-            a.angle = collAngle + PI / 2;
-          } else {
-            a.angle = collAngle - PI / 2;
+          // Velocity vectors
+          const avx = Math.cos(a.angle) * a.velocity;
+          const avy = Math.sin(a.angle) * a.velocity;
+          const bvx = Math.cos(b.angle) * b.velocity;
+          const bvy = Math.sin(b.angle) * b.velocity;
+
+          // Relative velocity along collision normal
+          const relVel = (avx - bvx) * nx + (avy - bvy) * ny;
+
+          // Only resolve if rocks are moving toward each other
+          if (relVel > 0) {
+            // Equal mass elastic collision with restitution
+            const impulse = relVel * restitution;
+
+            const newAvx = avx - impulse * nx;
+            const newAvy = avy - impulse * ny;
+            const newBvx = bvx + impulse * nx;
+            const newBvy = bvy + impulse * ny;
+
+            a.velocity = Math.sqrt(newAvx * newAvx + newAvy * newAvy);
+            b.velocity = Math.sqrt(newBvx * newBvx + newBvy * newBvy);
+
+            if (a.velocity > 0.01) {
+              a.angle = Math.atan2(newAvy, newAvx);
+            }
+            if (b.velocity > 0.01) {
+              b.angle = Math.atan2(newBvy, newBvx);
+            }
           }
-          if (a.angle > 2 * PI) a.angle -= 2 * PI;
-          if (a.angle < 0) a.angle += 2 * PI;
 
           // Separate overlapping rocks
           const overlap = minDist - dist;
-          const nx = dx / dist;
-          const ny = dy / dist;
-          a.x += nx * overlap * 0.5;
-          a.y += ny * overlap * 0.5;
-          b.x -= nx * overlap * 0.5;
-          b.y -= ny * overlap * 0.5;
+          a.x += (dx / dist) * overlap * 0.5;
+          a.y += (dy / dist) * overlap * 0.5;
+          b.x -= (dx / dist) * overlap * 0.5;
+          b.y -= (dy / dist) * overlap * 0.5;
 
           b.inPlay = true;
           b.active = true;
           b.stopped = false;
           b.friction = a.friction;
+          a.hasContacted = true;
+          b.hasContacted = true;
         }
       }
     }
@@ -237,25 +256,39 @@ export default function CurlingGame() {
         rock.x += moveX;
         rock.y += moveY;
 
-        // Boundary checks â€” out of play if past back line or off sides
-        if (rock.x < WORLD.backLine - 80) {
+        // --- Boundary checks (proper curling rules) ---
+
+        // BACK LINE RULE: Rock is removed only when its trailing edge
+        // (center + radius) fully crosses the back line.
+        if (rock.x - ROCK_RADIUS < WORLD.backLine) {
           rock.inPlay = false;
           rock.active = false;
           rock.velocity = 0;
           rock.x = 800; // park off screen
+          continue;
         }
-        if (Math.abs(rock.y) > 75) {
-          // Bounce off side boards gently
-          rock.y = Math.sign(rock.y) * 74;
-          rock.angle = PI - rock.angle + PI;
-          rock.velocity *= 0.4;
+
+        // SIDE BOARDS: narrow sheet, slight clearance beyond house rings
+        const sideLimit = WORLD.sheetHalfWidth;
+        if (Math.abs(rock.y) + ROCK_RADIUS > sideLimit) {
+          rock.y = Math.sign(rock.y) * (sideLimit - ROCK_RADIUS - 0.5);
+          // Reflect angle off side wall
+          rock.angle = -rock.angle;
+          rock.velocity *= 0.3;
         }
-        // Through the house without stopping
-        if (rock.x < WORLD.backLine - 20 && rock.velocity > 0.1) {
-          rock.inPlay = false;
-          rock.active = false;
-          rock.velocity = 0;
-          rock.x = 800;
+
+        // HOG LINE RULE: A delivered rock must fully cross the hog line
+        // (its trailing edge = center + radius must pass the line).
+        // Exception: if it contacted another rock before stopping, it stays.
+        if (rock.velocity <= 0.02 && rock.x > WORLD.hogLine - ROCK_RADIUS) {
+          if (!rock.hasContacted) {
+            // Didn't make it past the hog line â€” remove it
+            rock.inPlay = false;
+            rock.active = false;
+            rock.velocity = 0;
+            rock.x = 800;
+            continue;
+          }
         }
       }
 
@@ -322,7 +355,7 @@ export default function CurlingGame() {
     if (!rock) return;
 
     rock.x = WORLD.hackPos;
-    rock.y = aimAngle * 40; // map aim to cross-sheet position
+    rock.y = aimAngle * 30; // map aim to cross-sheet position (narrower sheet)
     rock.angle = PI + aimAngle * 0.08; // slight angle from aim
     rock.velocity = power * 0.14 + 2;
     rock.curl = curlDir * (6 + Math.random() * 2);
@@ -331,6 +364,7 @@ export default function CurlingGame() {
     rock.inPlay = true;
     rock.active = true;
     rock.stopped = false;
+    rock.hasContacted = false;
 
     deliveryRockRef.current = rock;
   }, [currentTeam, rockNum, aimAngle, power, curlDir]);
@@ -424,10 +458,11 @@ export default function CurlingGame() {
 
     // World-to-screen transform (top-down view of the sheet)
     // Sheet runs left-to-right on screen, x = along sheet, y = across
+    const sheetW = WORLD.sheetHalfWidth * 2;
     const toScreen = (wx, wy) => {
       const sx =
         W * 0.5 + (wx - WORLD.houseCenter.x) * (W / (WORLD.sheetLength * 0.9));
-      const sy = H * 0.5 + wy * (H / WORLD.sheetWidth) * 0.7;
+      const sy = H * 0.5 + wy * (H / sheetW) * 0.88;
       return [sx, sy];
     };
     const worldScale = W / (WORLD.sheetLength * 0.9);
@@ -438,8 +473,9 @@ export default function CurlingGame() {
       ctx.fillRect(0, 0, W, H);
 
       // --- Ice surface ---
-      const sheetLeft = toScreen(-700, -78);
-      const sheetRight = toScreen(100, 78);
+      const sheetEdge = WORLD.sheetHalfWidth;
+      const sheetLeft = toScreen(-700, -sheetEdge);
+      const sheetRight = toScreen(100, sheetEdge);
       const gradient = ctx.createLinearGradient(
         sheetLeft[0],
         0,
@@ -452,8 +488,8 @@ export default function CurlingGame() {
       gradient.addColorStop(1, "#dce9f2");
       ctx.fillStyle = gradient;
 
-      const tlSheet = toScreen(-680, -74);
-      const brSheet = toScreen(50, 74);
+      const tlSheet = toScreen(-680, -sheetEdge);
+      const brSheet = toScreen(50, sheetEdge);
       const shW = brSheet[0] - tlSheet[0];
       const shH = brSheet[1] - tlSheet[1];
       ctx.beginPath();
@@ -481,8 +517,8 @@ export default function CurlingGame() {
 
       // --- Lines ---
       const drawLine = (wx, color, width = 1.5) => {
-        const [sx1, sy1] = toScreen(wx, -74);
-        const [sx2, sy2] = toScreen(wx, 74);
+        const [sx1, sy1] = toScreen(wx, -sheetEdge);
+        const [sx2, sy2] = toScreen(wx, sheetEdge);
         ctx.strokeStyle = color;
         ctx.lineWidth = width;
         ctx.beginPath();
@@ -491,19 +527,18 @@ export default function CurlingGame() {
         ctx.stroke();
       };
 
-      // Hog lines
+      // Hog line (near â€” delivery side, rocks must fully cross this)
       drawLine(WORLD.hogLine, "#cc2233", 2.5);
-      drawLine(-WORLD.hogLine - 760, "#cc2233", 2.5); // far hog
+      // Far hog line
+      drawLine(WORLD.farHogLine, "#cc2233", 2.5);
 
-      // Tee line
+      // Tee line (through center of house)
       drawLine(WORLD.tLine, "#334466", 1.5);
 
-      // Back line
-      drawLine(WORLD.backLine, "#334466", 1.5);
+      // Back line (far edge of house â€” rocks removed when fully past this)
+      drawLine(WORLD.backLine, "#334466", 2);
 
       // Center line
-      const [clStart] = toScreen(-680, 0);
-      const [clEnd] = toScreen(50, 0);
       const clY = toScreen(0, 0)[1];
       ctx.strokeStyle = "#334466";
       ctx.lineWidth = 1;
@@ -535,14 +570,19 @@ export default function CurlingGame() {
           stroke: "rgba(180,190,200,0.5)",
         },
       ];
+      // Calculate y-scale relative to x-scale for proper circle aspect
+      const yScale = (H / sheetW) * 0.88;
+      const xScale = worldScale;
+      const aspectRatio = yScale / xScale;
       for (const ring of houseColors) {
         const [cx, cy] = toScreen(WORLD.houseCenter.x, WORLD.houseCenter.y);
-        const rScreen = ring.r * worldScale;
+        const rScreenX = ring.r * worldScale;
+        const rScreenY = rScreenX * aspectRatio;
         ctx.fillStyle = ring.fill;
         ctx.strokeStyle = ring.stroke;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.ellipse(cx, cy, rScreen, rScreen * 0.7, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx, cy, rScreenX, rScreenY, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       }
@@ -568,31 +608,32 @@ export default function CurlingGame() {
       for (const rock of rocksRef.current) {
         if (!rock.inPlay) continue;
         const [rx, ry] = toScreen(rock.x, rock.y);
-        const rr = ROCK_RADIUS * worldScale * 1.1;
+        const rrX = ROCK_RADIUS * worldScale * 1.1;
+        const rrY = rrX * aspectRatio;
         const tc = teamColors[rock.team];
 
         // Glow for moving rocks
         if (rock.velocity > 0.1) {
           ctx.fillStyle = tc.glow;
           ctx.beginPath();
-          ctx.ellipse(rx, ry, rr + 4, (rr + 4) * 0.7, 0, 0, Math.PI * 2);
+          ctx.ellipse(rx, ry, rrX + 4, rrY + 3, 0, 0, Math.PI * 2);
           ctx.fill();
         }
 
         // Shadow
         ctx.fillStyle = "rgba(0,0,0,0.18)";
         ctx.beginPath();
-        ctx.ellipse(rx + 2, ry + 1.5, rr, rr * 0.7, 0, 0, Math.PI * 2);
+        ctx.ellipse(rx + 2, ry + 1.5, rrX, rrY, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Rock body
         const rockGrad = ctx.createRadialGradient(
-          rx - rr * 0.3,
-          ry - rr * 0.2,
-          rr * 0.1,
+          rx - rrX * 0.3,
+          ry - rrY * 0.2,
+          rrX * 0.1,
           rx,
           ry,
-          rr,
+          rrX,
         );
         rockGrad.addColorStop(0, "#fff");
         rockGrad.addColorStop(0.35, tc.fill);
@@ -601,7 +642,7 @@ export default function CurlingGame() {
         ctx.strokeStyle = tc.stroke;
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.ellipse(rx, ry, rr, rr * 0.7, 0, 0, Math.PI * 2);
+        ctx.ellipse(rx, ry, rrX, rrY, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
 
@@ -609,15 +650,15 @@ export default function CurlingGame() {
         ctx.strokeStyle = "#555";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.ellipse(rx, ry, rr * 0.45, rr * 0.3, 0, 0, Math.PI * 2);
+        ctx.ellipse(rx, ry, rrX * 0.45, rrY * 0.45, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
 
       // --- Aiming indicator ---
       if (phase === "aiming" || phase === "power") {
-        const [ax, ay] = toScreen(WORLD.hackPos, aimAngle * 40);
+        const [ax, ay] = toScreen(WORLD.hackPos, aimAngle * 30);
         const targetX = WORLD.houseCenter.x;
-        const targetY = aimAngle * 40;
+        const targetY = aimAngle * 30;
         const [tx, ty] = toScreen(targetX, targetY);
 
         ctx.strokeStyle =
