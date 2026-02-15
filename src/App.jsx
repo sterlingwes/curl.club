@@ -499,31 +499,46 @@ export default function CurlingGame() {
           rock.velocity += dt * 0.25;
         }
 
-        // --- Differential friction curl ---
-        // Sample friction on both sides of the rock perpendicular to travel
+        // --- Curl: two independent components ---
+
+        // 1) SPIN CURL â€” from the running band's interaction with the ice.
+        //    A spinning rock has one side of its annular contact patch moving
+        //    against the direction of travel (more grip) and one side moving with
+        //    it (less grip). This asymmetry creates a lateral force whose
+        //    direction depends on spin, and whose magnitude depends on:
+        //    - local friction (more pebble = more grip = more curl)
+        //    - velocity (slower = running band bites harder = more curl)
+        //    - paperTurns (rougher running surface = more curl)
+        //    This works identically on uniform ice â€” no grid differential needed.
+        const localFriction = grid.sampleFriction(rock.x, rock.y);
+        const velocityFactor = 1.0 / (rock.velocity + 0.4);
+        const spinCurl =
+          rock.spin *
+          rock.paperTurns *
+          localFriction *
+          CURL_COEFFICIENT *
+          velocityFactor;
+
+        // 2) GRADIENT DRIFT â€” from friction variation across the rock's width.
+        //    If friction is higher on one side, that side decelerates more,
+        //    pulling the rock toward the higher-friction zone. Independent of spin.
+        //    This produces: trough trapping, dished-ice funneling, worn-path effects.
         const perpX = -Math.sin(rock.angle) * CURL_SAMPLE_OFFSET;
         const perpY = Math.cos(rock.angle) * CURL_SAMPLE_OFFSET;
         const fricLeft = grid.sampleFriction(rock.x + perpX, rock.y + perpY);
         const fricRight = grid.sampleFriction(rock.x - perpX, rock.y - perpY);
-        const fricDiff = fricLeft - fricRight;
-
-        // Curl force: differential friction Ã— spin Ã— paperTurns Ã— velocity-dependent factor
-        // Slower rocks curl more (running band bites harder at low speed)
-        const velocityFactor = 1.0 / (rock.velocity + 0.3);
-        const curlForce =
-          fricDiff *
-          rock.spin *
-          rock.paperTurns *
-          CURL_COEFFICIENT *
-          velocityFactor;
+        const fricGradient = fricLeft - fricRight;
+        // Drift toward the higher-friction side (perpendicular to travel)
+        const gradientDrift =
+          fricGradient * CURL_COEFFICIENT * 0.5 * velocityFactor;
 
         // --- Slope force (gravity, always present, independent of spin) ---
         const slopeForceX = slope.sx * SLOPE_GRAVITY;
         const slopeForceY = slope.sy * SLOPE_GRAVITY;
 
-        // --- Apply forces ---
-        // Lateral (perpendicular to current direction of travel)
-        rock.y += curlForce * dt;
+        // --- Apply lateral forces ---
+        rock.y += spinCurl * dt;
+        rock.y += gradientDrift * dt;
         rock.y += slopeForceY * dt;
 
         // Longitudinal slope: speeds up or slows down
