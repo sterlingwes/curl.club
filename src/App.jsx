@@ -915,7 +915,9 @@ export default function CurlingGame() {
               justifyContent: "center",
               background: "rgba(7,11,20,0.85)",
               borderRadius: 8,
+              cursor: "pointer",
             }}
+            onClick={handleAction}
           >
             <div
               style={{
@@ -963,7 +965,9 @@ export default function CurlingGame() {
               justifyContent: "center",
               background: "rgba(7,11,20,0.75)",
               borderRadius: 8,
+              cursor: "pointer",
             }}
+            onClick={handleAction}
           >
             <div style={{ fontSize: 14, color: "#6a8aaa", marginBottom: 6 }}>
               End {currentEnd} Result
@@ -1010,7 +1014,9 @@ export default function CurlingGame() {
               justifyContent: "center",
               background: "rgba(7,11,20,0.85)",
               borderRadius: 8,
+              cursor: "pointer",
             }}
+            onClick={handleAction}
           >
             <div style={{ fontSize: 14, color: "#6a8aaa", marginBottom: 6 }}>
               Final Score
