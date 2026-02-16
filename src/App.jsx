@@ -526,16 +526,16 @@ export default function CurlingGame() {
     if (!rock) return;
     rock.x = WORLD.hackPos;
     rock.y = aimAngle;
-    rock.angle = PI - (aimAngle / WORLD.sheetHalfWidth) * 0.08;
+    rock.angle = PI;
     rock.velocity = power * 0.12 + 1.8;
-    rock.spin = curlDir;
+    rock.spin = vertical ? curlDir : -curlDir;
     rock.paperTurns = 0.8 + Math.random() * 0.4;
     rock.inPlay = true;
     rock.active = true;
     rock.stopped = false;
     rock.hasContacted = false;
     deliveryRockRef.current = rock;
-  }, [currentTeam, rockNum, aimAngle, power, curlDir]);
+  }, [currentTeam, rockNum, aimAngle, power, curlDir, vertical]);
 
   useEffect(() => {
     if (phase !== "running") return;
