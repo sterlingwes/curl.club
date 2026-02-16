@@ -18,25 +18,21 @@ const WORLD = {
   houseRadii: [6, 24, 48, 72],
 };
 
-// ============================================================
-// ICE GRID
-// ============================================================
-const GRID_COLS = 48;
-const GRID_ROWS = 16;
-const GRID_X_MIN = WORLD.sheetEnd;
-const GRID_X_MAX = WORLD.sheetStart;
-const GRID_Y_MIN = -WORLD.sheetHalfWidth;
-const GRID_Y_MAX = WORLD.sheetHalfWidth;
+const GRID_COLS = 48,
+  GRID_ROWS = 16;
+const GRID_X_MIN = WORLD.sheetEnd,
+  GRID_X_MAX = WORLD.sheetStart;
+const GRID_Y_MIN = -WORLD.sheetHalfWidth,
+  GRID_Y_MAX = WORLD.sheetHalfWidth;
 const CELL_W = (GRID_X_MAX - GRID_X_MIN) / GRID_COLS;
 const CELL_H = (GRID_Y_MAX - GRID_Y_MIN) / GRID_ROWS;
 const CURL_SAMPLE_OFFSET = ROCK_RADIUS * 0.8;
 
-// Default tuning values
 const DEFAULTS = {
   baseFriction: 0.08,
   pebbleFrictionBonus: 0.07,
-  curlCoeff: 35, // much higher — spin curl needs to produce visible deflection
-  gradientCoeff: 8, // gradient drift multiplier
+  curlCoeff: 35,
+  gradientCoeff: 8,
   slopeGravity: 18,
   frictionDecel: 9,
   speedScale: 60,
@@ -54,11 +50,14 @@ function createCell() {
   };
 }
 
-function cellFriction(cell, baseFric, pebbleBonus) {
-  const p = baseFric + cell.pebbleHeight * pebbleBonus;
-  const m = cell.moisture * 0.03;
-  const t = cell.temperature * 0.002;
-  return Math.max(0.02, p - m + t);
+function cellFriction(cell, bf, pb) {
+  return Math.max(
+    0.02,
+    bf +
+      cell.pebbleHeight * pb -
+      cell.moisture * 0.03 +
+      cell.temperature * 0.002,
+  );
 }
 
 class IceGrid {
@@ -82,21 +81,17 @@ class IceGrid {
     ];
   }
   _bilinear(wx, wy, fn) {
-    const fx = (wx - GRID_X_MIN) / CELL_W - 0.5;
-    const fy = (wy - GRID_Y_MIN) / CELL_H - 0.5;
-    const c0 = Math.max(0, Math.min(GRID_COLS - 2, Math.floor(fx)));
-    const r0 = Math.max(0, Math.min(GRID_ROWS - 2, Math.floor(fy)));
-    const tx = Math.max(0, Math.min(1, fx - c0));
-    const ty = Math.max(0, Math.min(1, fy - r0));
-    const v00 = fn(this.cells[c0][r0]),
-      v10 = fn(this.cells[c0 + 1][r0]);
-    const v01 = fn(this.cells[c0][r0 + 1]),
-      v11 = fn(this.cells[c0 + 1][r0 + 1]);
+    const fx = (wx - GRID_X_MIN) / CELL_W - 0.5,
+      fy = (wy - GRID_Y_MIN) / CELL_H - 0.5;
+    const c0 = Math.max(0, Math.min(GRID_COLS - 2, Math.floor(fx))),
+      r0 = Math.max(0, Math.min(GRID_ROWS - 2, Math.floor(fy)));
+    const tx = Math.max(0, Math.min(1, fx - c0)),
+      ty = Math.max(0, Math.min(1, fy - r0));
     return (
-      v00 * (1 - tx) * (1 - ty) +
-      v10 * tx * (1 - ty) +
-      v01 * (1 - tx) * ty +
-      v11 * tx * ty
+      fn(this.cells[c0][r0]) * (1 - tx) * (1 - ty) +
+      fn(this.cells[c0 + 1][r0]) * tx * (1 - ty) +
+      fn(this.cells[c0][r0 + 1]) * (1 - tx) * ty +
+      fn(this.cells[c0 + 1][r0 + 1]) * tx * ty
     );
   }
   sampleFriction(wx, wy, bf, pb) {
@@ -115,8 +110,8 @@ class IceGrid {
         const cc = c + dc,
           rr = r + dr;
         if (cc < 0 || cc >= GRID_COLS || rr < 0 || rr >= GRID_ROWS) continue;
-        const w = dc === 0 && dr === 0 ? 1.0 : 0.3;
-        const cell = this.cells[cc][rr];
+        const w = dc === 0 && dr === 0 ? 1.0 : 0.3,
+          cell = this.cells[cc][rr];
         cell.pebbleHeight = Math.max(0, cell.pebbleHeight - wearRate * w * dt);
         if (isSweeping) {
           cell.pebbleHeight = Math.max(
@@ -137,9 +132,6 @@ class IceGrid {
   }
 }
 
-// ============================================================
-// ICE PROFILES
-// ============================================================
 const ICE_PROFILES = {
   championship: {
     name: "Championship",
@@ -168,8 +160,8 @@ const ICE_PROFILES = {
         for (let r = 0; r < GRID_ROWS; r++) {
           const cell = grid.cells[c][r];
           cell.temperature = -1.5;
-          const yW = GRID_Y_MIN + (r + 0.5) * CELL_H;
-          const xW = GRID_X_MIN + (c + 0.5) * CELL_W;
+          const yW = GRID_Y_MIN + (r + 0.5) * CELL_H,
+            xW = GRID_X_MIN + (c + 0.5) * CELL_W;
           if (Math.abs(yW - 25) < 8) {
             cell.temperature -= 2;
             cell.pebbleHeight -= 0.12;
@@ -254,13 +246,22 @@ function createRock(team, id) {
     active: false,
     stopped: false,
     hasContacted: false,
+    dbg: {
+      spinCurl: 0,
+      gradDrift: 0,
+      slopeY: 0,
+      slopeX: 0,
+      friction: 0,
+      vFactor: 0,
+      fL: 0,
+      fR: 0,
+      v: 0,
+      spin: 1,
+    },
   };
 }
 
-// ============================================================
-// SLIDER COMPONENT
-// ============================================================
-function Slider({ label, value, min, max, step, onChange, unit }) {
+function Slider({ label, value, min, max, step, onChange }) {
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}
@@ -290,25 +291,20 @@ function Slider({ label, value, min, max, step, onChange, unit }) {
         }}
       />
       <span
-        style={{ fontSize: 8, color: "#f0c830", minWidth: 36, fontWeight: 700 }}
+        style={{ fontSize: 8, color: "#f0c830", minWidth: 40, fontWeight: 700 }}
       >
         {typeof value === "number"
           ? value.toFixed(step < 1 ? (step < 0.01 ? 3 : 2) : 0)
           : value}
-        {unit || ""}
       </span>
     </div>
   );
 }
 
-// ============================================================
-// GAME
-// ============================================================
 export default function CurlingGame() {
-  const canvasRef = useRef(null);
-  const animRef = useRef(null);
-  const iceGridRef = useRef(new IceGrid());
-
+  const canvasRef = useRef(null),
+    animRef = useRef(null),
+    iceGridRef = useRef(new IceGrid());
   const [phase, setPhase] = useState("title");
   const [currentEnd, setCurrentEnd] = useState(1);
   const [totalEnds] = useState(8);
@@ -316,7 +312,6 @@ export default function CurlingGame() {
   const [rockNum, setRockNum] = useState(0);
   const [scores, setScores] = useState([[], []]);
   const [endScoreDisplay, setEndScoreDisplay] = useState(null);
-  const [message, setMessage] = useState("");
   const [aimAngle, setAimAngle] = useState(0);
   const [power, setPower] = useState(0);
   const [curlDir, setCurlDir] = useState(1);
@@ -325,21 +320,18 @@ export default function CurlingGame() {
   const [showOverlay, setShowOverlay] = useState(false);
   const [showProfilePicker, setShowProfilePicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-
-  // Tunable physics parameters
+  const [showDebug, setShowDebug] = useState(false);
   const [tune, setTune] = useState({ ...DEFAULTS });
   const setT = (key, val) => setTune((prev) => ({ ...prev, [key]: val }));
+  const rocksRef = useRef([]),
+    deliveryRockRef = useRef(null),
+    sweepingRef = useRef(false);
 
-  const rocksRef = useRef([]);
-  const deliveryRockRef = useRef(null);
-  const sweepingRef = useRef(false);
-
-  const initIce = useCallback((profileKey) => {
-    const grid = new IceGrid();
-    ICE_PROFILES[profileKey]?.init(grid);
-    iceGridRef.current = grid;
+  const initIce = useCallback((pk) => {
+    const g = new IceGrid();
+    ICE_PROFILES[pk]?.init(g);
+    iceGridRef.current = g;
   }, []);
-
   const initEnd = useCallback(() => {
     rocksRef.current = [];
     for (let t = 0; t < 2; t++)
@@ -360,8 +352,8 @@ export default function CurlingGame() {
         const b = rocks[j];
         if (!b.inPlay) continue;
         const dx = a.x - b.x,
-          dy = a.y - b.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+          dy = a.y - b.y,
+          dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ROCK_RADIUS * 2 && dist > 0) {
           const nx = (b.x - a.x) / dist,
             ny = (b.y - a.y) / dist;
@@ -373,8 +365,8 @@ export default function CurlingGame() {
           if (rv > 0) {
             const imp = rv * RESTITUTION;
             const nax = avx - imp * nx,
-              nay = avy - imp * ny;
-            const nbx = bvx + imp * nx,
+              nay = avy - imp * ny,
+              nbx = bvx + imp * nx,
               nby = bvy + imp * ny;
             a.velocity = Math.sqrt(nax * nax + nay * nay);
             b.velocity = Math.sqrt(nbx * nbx + nby * nby);
@@ -403,18 +395,13 @@ export default function CurlingGame() {
     rock.x = 800;
   };
 
-  // ============================================================
-  // PHYSICS TICK
-  // ============================================================
   const physicsTick = useCallback(
     (dt) => {
-      const rocks = rocksRef.current;
-      const grid = iceGridRef.current;
-      const T = tune;
+      const rocks = rocksRef.current,
+        grid = iceGridRef.current,
+        T = tune;
       let anyMoving = false;
-
       grid.evaporateMoisture(dt);
-
       for (const rock of rocks) {
         if (!rock.inPlay || rock.velocity <= 0.02) {
           if (rock.inPlay) rock.stopped = true;
@@ -422,7 +409,6 @@ export default function CurlingGame() {
         }
         anyMoving = true;
         rock.stopped = false;
-
         const isSweeping =
           sweepingRef.current && rock === deliveryRockRef.current;
         const friction = grid.sampleFriction(
@@ -432,28 +418,18 @@ export default function CurlingGame() {
           T.pebbleFrictionBonus,
         );
         const slope = grid.sampleSlope(rock.x, rock.y);
-
-        // Deceleration
         rock.velocity = Math.max(
           0,
           rock.velocity - friction * T.frictionDecel * dt,
         );
         if (isSweeping && rock.velocity > 0.3)
           rock.velocity += dt * T.sweepBoost;
-
-        // --- SPIN CURL ---
-        // Velocity factor: curl peaks at moderate speed and drops toward zero
-        // at both high speed (band skips) and near-zero (band stops rotating).
-        // Shape: v / (v² + k) peaks at v = sqrt(k)
-        const v = rock.velocity;
-        const vFactor = v / (v * v + 0.5);
+        const v = rock.velocity,
+          vFactor = v / (v * v + 0.5);
         const spinCurl =
-          -rock.spin * rock.paperTurns * friction * T.curlCoeff * vFactor;
-
-        // --- GRADIENT DRIFT ---
-        // Same velocity profile — no drift when rock is nearly stopped
-        const perpX = -Math.sin(rock.angle) * CURL_SAMPLE_OFFSET;
-        const perpY = Math.cos(rock.angle) * CURL_SAMPLE_OFFSET;
+          rock.spin * rock.paperTurns * friction * T.curlCoeff * vFactor;
+        const perpX = -Math.sin(rock.angle) * CURL_SAMPLE_OFFSET,
+          perpY = Math.cos(rock.angle) * CURL_SAMPLE_OFFSET;
         const fL = grid.sampleFriction(
           rock.x + perpX,
           rock.y + perpY,
@@ -467,27 +443,26 @@ export default function CurlingGame() {
           T.pebbleFrictionBonus,
         );
         const gradDrift = (fL - fR) * T.gradientCoeff * vFactor;
-
-        // --- SLOPE ---
-        // Scale slope by velocity — a nearly-stopped rock doesn't slide under gravity,
-        // static friction holds it in place
         const slopeScale = Math.min(1, v * 2);
-        const slopeY = slope.sy * T.slopeGravity * slopeScale;
-        const slopeX = slope.sx * T.slopeGravity * slopeScale;
-
-        // Apply lateral forces
-        rock.y += (spinCurl + gradDrift + slopeY) * dt;
-        // Longitudinal slope
-        rock.velocity = Math.max(0, rock.velocity + slopeX * dt * 0.5);
-
-        // Move
+        const slopeYF = slope.sy * T.slopeGravity * slopeScale,
+          slopeXF = slope.sx * T.slopeGravity * slopeScale;
+        rock.dbg = {
+          spinCurl,
+          gradDrift,
+          slopeY: slopeYF,
+          slopeX: slopeXF,
+          friction,
+          vFactor,
+          fL,
+          fR,
+          v,
+          spin: rock.spin,
+        };
+        rock.y += (spinCurl + gradDrift + slopeYF) * dt;
+        rock.velocity = Math.max(0, rock.velocity + slopeXF * dt * 0.5);
         rock.x += Math.cos(rock.angle) * rock.velocity * dt * T.speedScale;
         rock.y += Math.sin(rock.angle) * rock.velocity * dt * T.speedScale;
-
-        // Wear
         grid.applyWear(rock.x, rock.y, dt, isSweeping, T.wearRate);
-
-        // Boundaries
         if (rock.x - ROCK_RADIUS < WORLD.backLine) {
           removeRock(rock);
           continue;
@@ -512,10 +487,10 @@ export default function CurlingGame() {
   );
 
   const scoreEnd = useCallback(() => {
-    const rocks = rocksRef.current.filter((r) => r.inPlay);
-    const hx = WORLD.houseCenter.x,
-      hy = WORLD.houseCenter.y;
-    const maxR = WORLD.houseRadii[3] + ROCK_RADIUS;
+    const rocks = rocksRef.current.filter((r) => r.inPlay),
+      hx = WORLD.houseCenter.x,
+      hy = WORLD.houseCenter.y,
+      maxR = WORLD.houseRadii[3] + ROCK_RADIUS;
     const dists = [[], []];
     for (const r of rocks) {
       const d = Math.sqrt((r.x - hx) ** 2 + (r.y - hy) ** 2);
@@ -562,7 +537,6 @@ export default function CurlingGame() {
     deliveryRockRef.current = rock;
   }, [currentTeam, rockNum, aimAngle, power, curlDir]);
 
-  // Game loop
   useEffect(() => {
     if (phase !== "running") return;
     let last = performance.now();
@@ -613,7 +587,6 @@ export default function CurlingGame() {
     }, 30);
     return () => clearInterval(iv);
   }, [phase]);
-
   useEffect(() => {
     if (phase !== "power") return;
     let t = 0,
@@ -627,9 +600,7 @@ export default function CurlingGame() {
     return () => clearInterval(iv);
   }, [phase]);
 
-  // ============================================================
-  // RENDERING
-  // ============================================================
+  // === RENDERING ===
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -650,46 +621,37 @@ export default function CurlingGame() {
         ? [W / 2 + wy * uScale, H / 2 + (wx - wcx) * uScale]
         : [W / 2 - (wx - wcx) * uScale, H / 2 - wy * uScale];
     const r2s = (wr) => wr * uScale;
-    const T = tune;
-
-    // Pre-compute overlay image when overlay is on
-    let overlayImg = null;
-    const grid = iceGridRef.current;
+    const T = tune,
+      grid = iceGridRef.current;
+    // World +y force → screen delta. Horiz: +y → up (screen -y). Vert: +y → right (screen +x).
+    const fToS = (fy, sc) => (isV ? [fy * sc, 0] : [0, -fy * sc]);
 
     const buildOverlay = () => {
-      // Create an offscreen canvas for the heatmap
       const oc = document.createElement("canvas");
       oc.width = GRID_COLS;
       oc.height = GRID_ROWS;
-      const octx = oc.getContext("2d");
-      const id = octx.createImageData(GRID_COLS, GRID_ROWS);
+      const octx = oc.getContext("2d"),
+        id = octx.createImageData(GRID_COLS, GRID_ROWS);
       for (let c = 0; c < GRID_COLS; c++)
         for (let r = 0; r < GRID_ROWS; r++) {
-          const cell = grid.cells[c][r];
-          const idx = (r * GRID_COLS + c) * 4;
+          const cell = grid.cells[c][r],
+            idx = (r * GRID_COLS + c) * 4;
           const wear = 1 - Math.max(0, Math.min(1, cell.pebbleHeight));
           const fric = cellFriction(
             cell,
             T.baseFriction,
             T.pebbleFrictionBonus,
           );
-          const slopeMag = Math.sqrt(cell.slopeX ** 2 + cell.slopeY ** 2);
-
+          const sm = Math.sqrt(cell.slopeX ** 2 + cell.slopeY ** 2);
           if (showOverlay) {
-            // Full overlay: multi-channel heatmap
-            // Red channel: friction (high friction = red)
-            // Green channel: pebble height (high = green)
-            // Blue channel: moisture
-            // Alpha: always visible
-            const fricNorm = Math.max(0, Math.min(1, (fric - 0.05) / 0.15));
-            id.data[idx] = Math.floor(fricNorm * 200 + slopeMag * 8000); // R: friction + slope
-            id.data[idx + 1] = Math.floor((1 - wear) * 140); // G: pebble health
+            const fn = Math.max(0, Math.min(1, (fric - 0.05) / 0.15));
+            id.data[idx] = Math.floor(fn * 200 + sm * 8000);
+            id.data[idx + 1] = Math.floor((1 - wear) * 140);
             id.data[idx + 2] = Math.floor(
               cell.moisture * 255 + (cell.temperature < -1 ? 60 : 0),
-            ); // B: moisture + cold
-            id.data[idx + 3] = 160; // A
+            );
+            id.data[idx + 3] = 160;
           } else {
-            // Subtle wear-only during play
             id.data[idx] = Math.floor(wear * 60);
             id.data[idx + 1] = Math.floor(wear * 40);
             id.data[idx + 2] = Math.floor(cell.moisture * 120);
@@ -700,18 +662,46 @@ export default function CurlingGame() {
       return oc;
     };
 
+    const drawArrow = (sx, sy, dx, dy, color, label) => {
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 0.3) return;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + dx, sy + dy);
+      ctx.stroke();
+      const ang = Math.atan2(dy, dx);
+      ctx.beginPath();
+      ctx.moveTo(sx + dx, sy + dy);
+      ctx.lineTo(
+        sx + dx - Math.cos(ang - 0.5) * 4,
+        sy + dy - Math.sin(ang - 0.5) * 4,
+      );
+      ctx.moveTo(sx + dx, sy + dy);
+      ctx.lineTo(
+        sx + dx - Math.cos(ang + 0.5) * 4,
+        sy + dy - Math.sin(ang + 0.5) * 4,
+      );
+      ctx.stroke();
+      if (label) {
+        ctx.font = "bold 6px monospace";
+        ctx.textAlign = "left";
+        ctx.fillText(label, sx + dx + 2, sy + dy + 2);
+      }
+    };
+
     const draw = () => {
       ctx.fillStyle = "#0a0f1a";
       ctx.fillRect(0, 0, W, H);
-      const e = WORLD.sheetHalfWidth;
-      const tl = toS(WORLD.sheetStart, e),
+      const e = WORLD.sheetHalfWidth,
+        tl = toS(WORLD.sheetStart, e),
         br = toS(WORLD.sheetEnd, -e);
       const sL = Math.min(tl[0], br[0]),
-        sT2 = Math.min(tl[1], br[1]);
-      const sW = Math.abs(br[0] - tl[0]),
+        sT2 = Math.min(tl[1], br[1]),
+        sW = Math.abs(br[0] - tl[0]),
         sH = Math.abs(br[1] - tl[1]);
-
-      // Ice base
       const gr = isV
         ? ctx.createLinearGradient(sL, sT2, sL, sT2 + sH)
         : ctx.createLinearGradient(sL, sT2, sL + sW, sT2);
@@ -723,73 +713,45 @@ export default function CurlingGame() {
       ctx.roundRect(sL, sT2, sW, sH, 5);
       ctx.fill();
 
-      // Overlay heatmap — stretched over the sheet
       if (showOverlay || phase === "running" || phase === "scoring") {
-        overlayImg = buildOverlay();
+        const oImg = buildOverlay();
         ctx.save();
         ctx.imageSmoothingEnabled = true;
         ctx.globalAlpha = showOverlay ? 0.85 : 0.5;
-        // Map the GRID_COLS x GRID_ROWS image onto the sheet rectangle
-        // In vertical mode the grid axes are transposed
         if (isV) {
-          // Grid col = x-world → screen-y, grid row = y-world → screen-x
-          // We need to rotate + flip the overlay
           ctx.translate(sL, sT2 + sH);
           ctx.rotate(-PI / 2);
-          ctx.drawImage(overlayImg, 0, 0, GRID_COLS, GRID_ROWS, 0, 0, sH, sW);
+          ctx.drawImage(oImg, 0, 0, GRID_COLS, GRID_ROWS, 0, 0, sH, sW);
         } else {
-          // Grid col = x-world → screen-x (reversed), grid row = y-world → screen-y (reversed)
           ctx.translate(sL + sW, sT2 + sH);
           ctx.scale(-1, -1);
-          ctx.drawImage(overlayImg, 0, 0, GRID_COLS, GRID_ROWS, 0, 0, sW, sH);
+          ctx.drawImage(oImg, 0, 0, GRID_COLS, GRID_ROWS, 0, 0, sW, sH);
         }
         ctx.restore();
       }
-
-      // Slope arrows (overlay mode only)
       if (showOverlay) {
-        const step = 3;
-        for (let c = 0; c < GRID_COLS; c += step)
-          for (let r = 0; r < GRID_ROWS; r += step) {
+        for (let c = 0; c < GRID_COLS; c += 3)
+          for (let r = 0; r < GRID_ROWS; r += 3) {
             const cell = grid.cells[c][r];
             const mag = Math.sqrt(cell.slopeX ** 2 + cell.slopeY ** 2);
             if (mag < 0.0003) continue;
             const wx = GRID_X_MIN + (c + 0.5) * CELL_W,
               wy = GRID_Y_MIN + (r + 0.5) * CELL_H;
             const [sx, sy] = toS(wx, wy);
-            const ang = Math.atan2(cell.slopeY, cell.slopeX);
             const len = Math.min(12, mag * 3000);
-            // Draw in screen space — need to account for axis flipping
-            let screenAng;
-            if (isV) screenAng = -ang + PI / 2;
-            else screenAng = PI - ang;
-            // flip Y for screen
-            const ex = sx + Math.cos(screenAng) * len;
-            const ey = sy - Math.sin(screenAng) * len;
+            const ang = Math.atan2(cell.slopeY, cell.slopeX);
+            const sa = isV ? -ang + PI / 2 : PI - ang;
+            const ex = sx + Math.cos(sa) * len,
+              ey = sy - Math.sin(sa) * len;
             ctx.strokeStyle = `rgba(255,220,80,${Math.min(0.8, mag * 250)})`;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(sx, sy);
             ctx.lineTo(ex, ey);
             ctx.stroke();
-            // Arrowhead
-            const ha = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(ex, ey);
-            ctx.lineTo(
-              ex - Math.cos(screenAng - ha) * 4,
-              ey + Math.sin(screenAng - ha) * 4,
-            );
-            ctx.moveTo(ex, ey);
-            ctx.lineTo(
-              ex - Math.cos(screenAng + ha) * 4,
-              ey + Math.sin(screenAng + ha) * 4,
-            );
-            ctx.stroke();
           }
       }
 
-      // Pebble dots (lighter)
       ctx.fillStyle = "rgba(180,200,215,0.06)";
       let seed = 42;
       const rnd = () => {
@@ -808,7 +770,6 @@ export default function CurlingGame() {
         ctx.fill();
       }
 
-      // Lines
       const drawWL = (wx, color, w) => {
         const [x1, y1] = toS(wx, -e),
           [x2, y2] = toS(wx, e);
@@ -829,7 +790,6 @@ export default function CurlingGame() {
       ctx.lineTo(...toS(WORLD.sheetEnd, 0));
       ctx.stroke();
 
-      // House
       const [hcx, hcy] = toS(WORLD.houseCenter.x, WORLD.houseCenter.y);
       [
         [72, "rgba(30,90,180,0.15)", "rgba(30,90,180,0.30)"],
@@ -850,14 +810,12 @@ export default function CurlingGame() {
       ctx.arc(hcx, hcy, Math.max(2, r2s(1.2)), 0, PI * 2);
       ctx.fill();
 
-      // Hack
       const [hkx, hky] = toS(WORLD.hackPos, 0);
       const hs = r2s(3);
       ctx.fillStyle = "#222";
       if (isV) ctx.fillRect(hkx - hs * 2, hky - hs / 2, hs * 4, hs);
       else ctx.fillRect(hkx - hs / 2, hky - hs * 2, hs, hs * 4);
 
-      // Rocks
       const tcA = [
         { f: "#f0c830", s: "#b8941e", g: "rgba(240,200,48,0.28)" },
         { f: "#d03030", s: "#8b1a1a", g: "rgba(208,48,48,0.28)" },
@@ -900,9 +858,68 @@ export default function CurlingGame() {
         ctx.beginPath();
         ctx.arc(rx, ry, rr * 0.4, 0, PI * 2);
         ctx.stroke();
+
+        if (showDebug && rock.velocity > 0.02) {
+          const d = rock.dbg,
+            sc = 10;
+          const [scX, scY] = fToS(d.spinCurl, sc),
+            [gdX, gdY] = fToS(d.gradDrift, sc),
+            [slX, slY] = fToS(d.slopeY, sc);
+          const net = d.spinCurl + d.gradDrift + d.slopeY;
+          const [nX, nY] = fToS(net, sc);
+          const bx = rx,
+            by = ry - rr - 3;
+          drawArrow(bx, by, scX, scY, "#00ffff", "sc:" + d.spinCurl.toFixed(2));
+          drawArrow(
+            bx,
+            by - 10,
+            gdX,
+            gdY,
+            "#ff00ff",
+            "gd:" + d.gradDrift.toFixed(3),
+          );
+          drawArrow(
+            bx,
+            by - 20,
+            slX,
+            slY,
+            "#ffdd00",
+            "sl:" + d.slopeY.toFixed(3),
+          );
+          drawArrow(bx, by - 30, nX, nY, "#ffffff", "\u03A3:" + net.toFixed(2));
+          ctx.font = "bold 5px monospace";
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#aaddaa";
+          ctx.fillText(
+            "spin=" +
+              (d.spin > 0 ? "+1" : "-1") +
+              " v=" +
+              d.v.toFixed(2) +
+              " vF=" +
+              d.vFactor.toFixed(3),
+            rx,
+            ry + rr + 9,
+          );
+          ctx.fillStyle = "#aaaadd";
+          ctx.fillText(
+            "fric=" +
+              d.friction.toFixed(4) +
+              " fL=" +
+              d.fL.toFixed(4) +
+              " fR=" +
+              d.fR.toFixed(4),
+            rx,
+            ry + rr + 17,
+          );
+          ctx.fillStyle = "#ddaaaa";
+          ctx.fillText(
+            "y=" + rock.y.toFixed(1) + " ang=" + rock.angle.toFixed(4),
+            rx,
+            ry + rr + 25,
+          );
+        }
       }
 
-      // Remaining rocks
       for (let t = 0; t < 2; t++) {
         const rem = rocksRef.current.filter(
           (r) => r.team === t && !r.inPlay && r.x >= 200,
@@ -921,7 +938,6 @@ export default function CurlingGame() {
         }
       }
 
-      // Aim
       if (phase === "aiming" || phase === "power") {
         const [ax, ay] = toS(WORLD.hackPos, aimAngle),
           [tx, ty] = toS(WORLD.houseCenter.x, aimAngle);
@@ -947,7 +963,6 @@ export default function CurlingGame() {
         ctx.stroke();
       }
 
-      // Sweep
       if (
         phase === "running" &&
         deliveryRockRef.current?.inPlay &&
@@ -958,35 +973,54 @@ export default function CurlingGame() {
         ctx.fillStyle = "rgba(255,255,255,0.6)";
         ctx.font = "bold 10px monospace";
         ctx.textAlign = "center";
-        ctx.fillText("🧹", sx, sy - r2s(ROCK_RADIUS) - 6);
+        ctx.fillText(
+          "\uD83E\uDDF9",
+          sx,
+          sy - r2s(ROCK_RADIUS) - (showDebug ? 38 : 6),
+        );
         ctx.textAlign = "start";
       }
 
-      // Overlay legend
       if (showOverlay) {
         ctx.fillStyle = "rgba(7,11,20,0.75)";
         ctx.fillRect(sL + 4, sT2 + 4, 110, 56);
         ctx.font = "bold 8px monospace";
         ctx.fillStyle = "#c8d8e8";
-        ctx.fillText("OVERLAY LEGEND", sL + 8, sT2 + 14);
+        ctx.fillText("OVERLAY", sL + 8, sT2 + 14);
         ctx.font = "7px monospace";
         ctx.fillStyle = "#e05050";
-        ctx.fillText("■ Red = high friction", sL + 8, sT2 + 24);
+        ctx.fillText("\u25A0 Red = high friction", sL + 8, sT2 + 24);
         ctx.fillStyle = "#50c050";
-        ctx.fillText("■ Green = pebble health", sL + 8, sT2 + 33);
+        ctx.fillText("\u25A0 Green = pebble health", sL + 8, sT2 + 33);
         ctx.fillStyle = "#5080e0";
-        ctx.fillText("■ Blue = moisture / cold", sL + 8, sT2 + 42);
+        ctx.fillText("\u25A0 Blue = moisture / cold", sL + 8, sT2 + 42);
         ctx.fillStyle = "#f0d830";
-        ctx.fillText("→ Yellow = slope direction", sL + 8, sT2 + 51);
+        ctx.fillText("\u2192 Yellow = slope direction", sL + 8, sT2 + 51);
+      }
+      if (showDebug) {
+        const lx = sL + sW - 140,
+          ly = sT2 + 4;
+        ctx.fillStyle = "rgba(7,11,20,0.85)";
+        ctx.fillRect(lx, ly, 136, 56);
+        ctx.font = "bold 7px monospace";
+        ctx.fillStyle = "#00ffff";
+        ctx.fillText("\u2192 cyan = spin curl", lx + 4, ly + 12);
+        ctx.fillStyle = "#ff00ff";
+        ctx.fillText("\u2192 magenta = grad drift", lx + 4, ly + 22);
+        ctx.fillStyle = "#ffdd00";
+        ctx.fillText("\u2192 yellow = slope force", lx + 4, ly + 32);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("\u2192 white = NET lateral (\u03A3)", lx + 4, ly + 42);
+        ctx.fillStyle = "#888";
+        ctx.fillText("arrow len = force magnitude", lx + 4, ly + 52);
       }
 
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [phase, aimAngle, currentTeam, vertical, showOverlay, tune]);
+  }, [phase, aimAngle, currentTeam, vertical, showOverlay, showDebug, tune]);
 
-  // Click handler
   const handleAction = useCallback(() => {
     if (phase === "title") {
       initIce(iceProfile);
@@ -1050,7 +1084,6 @@ export default function CurlingGame() {
   const totalScore = (t) => scores[t].reduce((a, b) => a + b, 0);
   const tn = (t) => (t === 0 ? "Yellow" : "Red");
   const tCol = (t) => (t === 0 ? "#f0c830" : "#d03030");
-
   const [dims, setDims] = useState({ w: 900, h: 500 });
   useEffect(() => {
     const resize = () => {
@@ -1100,7 +1133,6 @@ export default function CurlingGame() {
         userSelect: "none",
       }}
     >
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -1113,20 +1145,18 @@ export default function CurlingGame() {
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 18,
-              fontWeight: 800,
-              background: "linear-gradient(135deg,#e8f0ff,#8ab4f8)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            CURLING
-          </h1>
-        </div>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: 18,
+            fontWeight: 800,
+            background: "linear-gradient(135deg,#e8f0ff,#8ab4f8)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          CURLING
+        </h1>
         <div
           style={{
             display: "flex",
@@ -1137,11 +1167,9 @@ export default function CurlingGame() {
           }}
         >
           {phase !== "title" && phase !== "gameover" && (
-            <>
-              <span style={{ fontSize: 9 }}>
-                E<b>{currentEnd}</b> R<b>{rockLabel}</b>
-              </span>
-            </>
+            <span style={{ fontSize: 9 }}>
+              E<b>{currentEnd}</b> R<b>{rockLabel}</b>
+            </span>
           )}
           <button onClick={() => setVertical((v) => !v)} style={btn}>
             {vertical ? "⟷" : "⟳"}
@@ -1149,28 +1177,27 @@ export default function CurlingGame() {
           <button
             onClick={() => setShowOverlay((v) => !v)}
             style={{ ...btn, color: showOverlay ? "#f0c830" : "#8ab4f8" }}
-            title="Ice overlay"
           >
             🧊
           </button>
           <button
-            onClick={() => setShowProfilePicker((v) => !v)}
-            style={btn}
-            title="Ice profile"
+            onClick={() => setShowDebug((v) => !v)}
+            style={{ ...btn, color: showDebug ? "#00ffcc" : "#8ab4f8" }}
           >
+            🐛
+          </button>
+          <button onClick={() => setShowProfilePicker((v) => !v)} style={btn}>
             ⚙
           </button>
           <button
             onClick={() => setShowAdvanced((v) => !v)}
             style={{ ...btn, color: showAdvanced ? "#f0c830" : "#8ab4f8" }}
-            title="Physics tuning"
           >
             🔧
           </button>
         </div>
       </div>
 
-      {/* Profile picker */}
       {showProfilePicker && (
         <div
           style={{
@@ -1193,8 +1220,6 @@ export default function CurlingGame() {
                 ...btn,
                 padding: "3px 8px",
                 color: iceProfile === k ? "#f0c830" : "#8ab4f8",
-                borderColor:
-                  iceProfile === k ? "#f0c83040" : "rgba(255,255,255,0.1)",
               }}
             >
               <div style={{ fontWeight: 700, fontSize: 8 }}>{p.name}</div>
@@ -1206,7 +1231,6 @@ export default function CurlingGame() {
         </div>
       )}
 
-      {/* Advanced tuning panel */}
       {showAdvanced && (
         <div
           style={{
@@ -1320,7 +1344,6 @@ export default function CurlingGame() {
         </div>
       )}
 
-      {/* Scoreboard */}
       {phase !== "title" && (
         <div
           style={{
@@ -1398,7 +1421,6 @@ export default function CurlingGame() {
         </div>
       )}
 
-      {/* Canvas */}
       <div
         style={{ position: "relative", borderRadius: 8, overflow: "hidden" }}
       >
@@ -1561,7 +1583,6 @@ export default function CurlingGame() {
         )}
       </div>
 
-      {/* Controls */}
       <div
         style={{
           display: "flex",
@@ -1645,7 +1666,7 @@ export default function CurlingGame() {
             }}
             style={{ ...btn, color: "#c8d8e8" }}
           >
-            Curl: {curlDir > 0 ? "→ In" : "← Out"}
+            {curlDir > 0 ? "↻ CW (right)" : "↺ CCW (left)"}
           </button>
         )}
         {phase === "running" && (

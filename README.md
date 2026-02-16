@@ -1,9 +1,3 @@
-# curl.club
-
-A curling game
-
----
-
 # Curling — Grid-Based Ice Physics Engine
 
 Reimplementation inspired by WinCurl 2.0 (c.2000), a VB3/4 curling simulation. The original game used a closed-source `wincurl.dll` for physics. This project reverse-engineers the core concepts and extends them with a grid-based ice model that simulates realistic surface properties, wear, and environmental effects.
@@ -108,7 +102,7 @@ This naturally produces:
 
 - **Trough trapping**: a low-friction channel has higher friction on both walls, centering the rock.
 - **Worn-path drift**: a rock on the edge of a worn path gets pulled toward the fresh pebble.
-- **Dished-ice funneling**: center-heavy pebble pulls rocks inward.
+- **Dished-ice funneling**: edges have thicker pebble (higher friction), so the outside of the rock's path decelerates more, pulling rocks toward the lower-friction center.
 
 #### 3. Slope / Fall
 
