@@ -31,13 +31,13 @@ const CURL_SAMPLE_OFFSET = ROCK_RADIUS * 0.8;
 const DEFAULTS = {
   baseFriction: 0.08,
   pebbleFrictionBonus: 0.07,
-  curlCoeff: 35,
+  curlCoeff: 40,
   gradientCoeff: 8,
   slopeGravity: 18,
-  frictionDecel: 9,
+  frictionDecel: 5,
   speedScale: 60,
   wearRate: 0.0015,
-  sweepBoost: 0.25,
+  sweepBoost: 0.15,
 };
 
 function createCell() {
@@ -425,7 +425,7 @@ export default function CurlingGame() {
         if (isSweeping && rock.velocity > 0.3)
           rock.velocity += dt * T.sweepBoost;
         const v = rock.velocity,
-          vFactor = v / (v * v + 0.5);
+          vFactor = Math.max(0.3, Math.sqrt(v / 2));
         const spinCurl =
           rock.spin * rock.paperTurns * friction * T.curlCoeff * vFactor;
         const perpX = -Math.sin(rock.angle) * CURL_SAMPLE_OFFSET,
@@ -527,7 +527,7 @@ export default function CurlingGame() {
     rock.x = WORLD.hackPos;
     rock.y = aimAngle;
     rock.angle = PI;
-    rock.velocity = power * 0.12 + 1.8;
+    rock.velocity = 1.8 + 2.6 * Math.pow(power / 100, 0.5);
     rock.spin = vertical ? curlDir : -curlDir;
     rock.paperTurns = 0.8 + Math.random() * 0.4;
     rock.inPlay = true;
