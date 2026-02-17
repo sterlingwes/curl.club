@@ -1,0 +1,43 @@
+name: Physics Snapshot Tests
+
+on:
+  push:
+    paths:
+      - 'tests/**'
+      - 'src/App.jsx'
+  pull_request:
+    paths:
+      - 'tests/**'
+      - 'src/App.jsx'
+  workflow_dispatch:
+
+jobs:
+  snapshots:
+    name: Run physics snapshots
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run snapshot tests
+        run: node tests/run-snapshots.js
+
+      - name: Upload snapshot SVGs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: physics-snapshots
+          path: tests/snapshots/*.svg
+          retention-days: 30
+
+      - name: Upload trace data
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: physics-traces
+          path: tests/snapshots/*.json
+          retention-days: 14
