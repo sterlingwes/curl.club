@@ -23,7 +23,7 @@ function sx(worldX) {
   return WORLD.sheetStart - worldX;
 }
 function sy(worldY) {
-  return WORLD.sheetHalfWidth - worldY;
+  return WORLD.sheetHalfWidth + worldY;
 }
 function escXml(s) {
   return String(s)
@@ -78,6 +78,14 @@ function svgSheet(contentFn, opts = {}) {
   svg += `<text x="${sx(WORLD.tLine) + 2}" y="-4" font-size="6" fill="#778899" opacity="0.7">TEE</text>\n`;
   svg += `<text x="${sx(WORLD.backLine) + 2}" y="-4" font-size="6" fill="#778899" opacity="0.7">BACK</text>\n`;
 
+  // Y-axis labels (top = -y = CCW curl direction, bottom = +y = CW curl direction)
+  svg += `<text x="-4" y="10" font-size="6" fill="#6a8aaa" text-anchor="end">−y</text>\n`;
+  svg += `<text x="-4" y="${H_RANGE - 2}" font-size="6" fill="#6a8aaa" text-anchor="end">+y</text>\n`;
+  svg += `<text x="-4" y="${sy(0) + 2}" font-size="5" fill="#556677" text-anchor="end">0</text>\n`;
+  // CW/CCW direction hints
+  svg += `<text x="-4" y="22" font-size="5" fill="#445566" text-anchor="end">CCW→</text>\n`;
+  svg += `<text x="-4" y="${H_RANGE - 10}" font-size="5" fill="#445566" text-anchor="end">CW→</text>\n`;
+
   svg += contentFn();
   svg += `</svg>`;
   return svg;
@@ -124,15 +132,15 @@ function generateSVG(trace, summary) {
           const sc = 5;
 
           // Curl → negative sy for positive world-y curl
-          const curlDy = -p.spinCurl * sc;
+          const curlDy = p.spinCurl * sc;
           if (Math.abs(curlDy) > 0.5)
             out += `<line x1="${px}" y1="${py}" x2="${px}" y2="${(py + curlDy).toFixed(1)}" stroke="#00ddff" stroke-width="1.5" opacity="0.8"/>\n`;
 
-          const gradDy = -p.gradDrift * sc;
+          const gradDy = p.gradDrift * sc;
           if (Math.abs(gradDy) > 0.5)
             out += `<line x1="${px}" y1="${py}" x2="${px}" y2="${(py + gradDy).toFixed(1)}" stroke="#ff44ff" stroke-width="1.5" opacity="0.8"/>\n`;
 
-          const slopeDy = -p.slopeY * sc;
+          const slopeDy = p.slopeY * sc;
           if (Math.abs(slopeDy) > 0.5)
             out += `<line x1="${px}" y1="${py}" x2="${px}" y2="${(py + slopeDy).toFixed(1)}" stroke="#ffdd00" stroke-width="1.5" opacity="0.8"/>\n`;
         }
