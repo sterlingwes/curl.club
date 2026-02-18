@@ -4,7 +4,7 @@
 
 A curling game (React/Canvas2D, single-file `.jsx` artifact) originally reverse-engineered from **WinCurl 2.0** (a VB3 game from ~2000). It has a full physics engine with ice grid simulation (pebble wear, curl, slope, sweep), collision resolution, 8-end game structure, and scoring.
 
-**Live file:** `curling-game.jsx` (currently ~612 lines, runs as a Claude.ai artifact)
+**Live file:** `src/App.jsx` (currently ~612 lines, was a claude.ai artifact but should eventually be componentized)
 
 **Test suite:** `test/` directory with headless physics simulator, 18 scenario tests, SVG visualization, and GitHub Actions CI.
 
@@ -42,7 +42,7 @@ A curling game (React/Canvas2D, single-file `.jsx` artifact) originally reverse-
 ### File Structure
 
 ```
-curling-game.jsx          # Single-file React artifact (everything inlined)
+src/App.jsx          # Single-file React artifact (everything inlined)
 test/
   physics-sim.js          # Headless physics simulator (extracted from game)
   scenarios.js            # 18 test scenarios with soft expectations
@@ -136,7 +136,7 @@ Replace the single `<canvas>` with a responsive layout containing three canvases
 │              │Zoom  ││
 │              └──────┘│
 ├──────────────────────┤
-│  Controls + Power    │  ← Docked at bottom
+│  Controls            │  ← Docked at bottom
 └──────────────────────┘
 ```
 
@@ -150,7 +150,7 @@ Replace the single `<canvas>` with a responsive layout containing three canvases
 │               │  House   │
 │               │  Zoom    │
 ├───────────────┴──────────┤
-│  Controls + Power bar    │
+│  Controls                │
 └──────────────────────────┘
 ```
 
@@ -257,12 +257,8 @@ The test suite runs the **headless physics simulator** (`test/physics-sim.js`) w
 
 ## Important Notes
 
-1. **Single-file constraint** — The artifact must be one `.jsx` file. All components, renderers, themes, and physics are inlined. The separate `components/` files in the working directory are reference implementations that need to be kept inline in the main file.
+1. **Spin direction** — We spent multiple sessions debugging curl direction. The sign convention is: `rock.spin > 0` = CW rotation = curls toward +y (right). Negation was historically needed for horizontal mode (`rock.spin = vertical ? curlDir : -curlDir`) but should become `rock.spin = curlDir` after removing horizontal.
 
-2. **No network** — The Claude.ai artifact environment has no network access. No CDN imports beyond what's available (React, Tailwind core, recharts, d3, Three.js r128, etc.).
+1. **The `drawPerspective` function is tested** — The projection math was verified to produce correct screen coordinates (hack at bottom, house in upper-center, natural narrowing). But it hasn't been rendered in a real canvas yet, so visual tweaks will likely be needed.
 
-3. **Spin direction** — We spent multiple sessions debugging curl direction. The sign convention is: `rock.spin > 0` = CW rotation = curls toward +y (right). Negation was historically needed for horizontal mode (`rock.spin = vertical ? curlDir : -curlDir`) but should become `rock.spin = curlDir` after removing horizontal.
-
-4. **The `drawPerspective` function is tested** — The projection math was verified to produce correct screen coordinates (hack at bottom, house in upper-center, natural narrowing). But it hasn't been rendered in a real canvas yet, so visual tweaks will likely be needed.
-
-5. **Theme switching is live** — The 🎨 button toggles between themes at any time. The canvas re-renders immediately. The theme object is passed to all renderers via the render state.
+1. **Theme switching is live** — The 🎨 button toggles between themes at any time. The canvas re-renders immediately. The theme object is passed to all renderers via the render state.
