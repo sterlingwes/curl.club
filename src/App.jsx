@@ -71,6 +71,7 @@ const THEMES = {
       [6, "rgba(225,232,242,0.35)", "rgba(180,190,200,0.30)", 1.5],
     ],
     buttonFill: "#1a1a2e",
+    houseCrosshairs: false,
     // Hack
     hackFill: "#222",
     // Rocks
@@ -135,6 +136,7 @@ const THEMES = {
       [6, "rgba(255,255,255,0.95)", "#000000", 2],
     ],
     buttonFill: "#000000",
+    houseCrosshairs: true,
     // Hack
     hackFill: "#000000",
     // Rocks — flat, bold
@@ -170,6 +172,358 @@ const THEMES = {
     sweepCorridor: true,
   },
 };
+
+// ============================================================
+// SHARED DRAWING UTILS
+// ============================================================
+function drawHouseRings(ctx, cx, cy, r2s, th) {
+  th.houseRings.forEach(([r, f, s, lw]) => {
+    ctx.fillStyle = f;
+    ctx.strokeStyle = s;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r2s(r), 0, PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
+  ctx.fillStyle = th.buttonFill;
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(2, r2s(1.2)), 0, PI * 2);
+  ctx.fill();
+  if (th.houseCrosshairs) {
+    const cr = r2s(75);
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - cr, cy);
+    ctx.lineTo(cx + cr, cy);
+    ctx.moveTo(cx, cy - cr);
+    ctx.lineTo(cx, cy + cr);
+    ctx.stroke();
+  }
+}
+
+function drawRockFn(ctx, rx, ry, rr, c, th, moving) {
+  if (moving) {
+    ctx.fillStyle = c.g;
+    ctx.beginPath();
+    ctx.arc(rx, ry, rr + 3, 0, PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "rgba(0,0,0,0.12)";
+  ctx.beginPath();
+  ctx.arc(rx + 1, ry + 1, rr, 0, PI * 2);
+  ctx.fill();
+  if (th.rockGradient) {
+    const rg = ctx.createRadialGradient(
+      rx - rr * 0.3,
+      ry - rr * 0.3,
+      rr * 0.1,
+      rx,
+      ry,
+      rr,
+    );
+    rg.addColorStop(0, "#fff");
+    rg.addColorStop(0.35, c.f);
+    rg.addColorStop(1, c.s);
+    ctx.fillStyle = rg;
+  } else {
+    ctx.fillStyle = c.f;
+  }
+  ctx.strokeStyle = c.s;
+  ctx.lineWidth = th.rockGradient ? 1 : 2;
+  ctx.beginPath();
+  ctx.arc(rx, ry, rr, 0, PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = th.rockStroke;
+  ctx.lineWidth = th.rockHandleWidth;
+  ctx.beginPath();
+  ctx.arc(rx, ry, rr * 0.4, 0, PI * 2);
+  ctx.stroke();
+}
+
+// ============================================================
+// PERSPECTIVE RENDERER
+// ============================================================
+function drawPerspective(ctx, W, H, state) {
+  const {
+    WORLD: WD,
+    ROCK_RADIUS: RR,
+    rocks,
+    deliveryRock,
+    sweeping,
+    phase,
+    aimAngle,
+    currentTeam,
+    theme: th,
+  } = state;
+  const camX = WD.hackPos + 80,
+    camH = 60,
+    fLen = W * 0.75,
+    hrzY = H * 0.32,
+    e = WD.sheetHalfWidth;
+  const proj = (wx, wy, wz = 0) => {
+    const d = camX - wx;
+    if (d <= 0) return null;
+    return {
+      sx: W / 2 + (wy * fLen) / d,
+      sy: hrzY + ((camH - wz) * fLen) / d,
+      sc: fLen / d,
+      d,
+    };
+  };
+  ctx.fillStyle = th.canvasBg;
+  ctx.fillRect(0, 0, W, H);
+  const nearX = WD.hackPos,
+    farX = WD.backLine - 20;
+  const nL = proj(nearX, -e),
+    nR = proj(nearX, e),
+    fL = proj(farX, -e),
+    fR = proj(farX, e);
+  if (nL && nR && fL && fR) {
+    const ig = ctx.createLinearGradient(0, fL.sy, 0, nL.sy);
+    ig.addColorStop(0, th.sheetGradient[0]);
+    ig.addColorStop(0.5, th.sheetGradient[1]);
+    ig.addColorStop(1, th.sheetGradient[2]);
+    ctx.fillStyle = ig;
+    ctx.beginPath();
+    ctx.moveTo(nL.sx, nL.sy);
+    ctx.lineTo(fL.sx, fL.sy);
+    ctx.lineTo(fR.sx, fR.sy);
+    ctx.lineTo(nR.sx, nR.sy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = th.canvasBg;
+    const bH = 8,
+      nLH = proj(nearX, -e, bH),
+      fLH = proj(farX, -e, bH);
+    if (nLH && fLH) {
+      ctx.beginPath();
+      ctx.moveTo(nL.sx, nL.sy);
+      ctx.lineTo(fL.sx, fL.sy);
+      ctx.lineTo(fLH.sx, fLH.sy);
+      ctx.lineTo(nLH.sx, nLH.sy);
+      ctx.closePath();
+      ctx.fill();
+    }
+    const nRH = proj(nearX, e, bH),
+      fRH = proj(farX, e, bH);
+    if (nRH && fRH) {
+      ctx.beginPath();
+      ctx.moveTo(nR.sx, nR.sy);
+      ctx.lineTo(fR.sx, fR.sy);
+      ctx.lineTo(fRH.sx, fRH.sy);
+      ctx.lineTo(nRH.sx, nRH.sy);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  const dl3 = (wx, col, w) => {
+    const l = proj(wx, -e),
+      r = proj(wx, e);
+    if (!l || !r) return;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = Math.max(0.5, w * l.sc * 0.3);
+    ctx.beginPath();
+    ctx.moveTo(l.sx, l.sy);
+    ctx.lineTo(r.sx, r.sy);
+    ctx.stroke();
+  };
+  dl3(WD.hogLine, th.hogLine, th.lineWidth.hog);
+  dl3(WD.tLine, th.tLine, th.lineWidth.tee);
+  dl3(WD.backLine, th.backLine, th.lineWidth.back);
+  const cN = proj(nearX, 0),
+    cF = proj(farX, 0);
+  if (cN && cF) {
+    ctx.strokeStyle = th.centerLine;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cN.sx, cN.sy);
+    ctx.lineTo(cF.sx, cF.sy);
+    ctx.stroke();
+  }
+  const hp = proj(WD.houseCenter.x, WD.houseCenter.y);
+  if (hp) {
+    for (const [r, fill, stroke, lw] of th.houseRings) {
+      const lft = proj(WD.houseCenter.x, WD.houseCenter.y - r),
+        rgt = proj(WD.houseCenter.x, WD.houseCenter.y + r),
+        top = proj(WD.houseCenter.x - r, WD.houseCenter.y),
+        bot = proj(WD.houseCenter.x + r, WD.houseCenter.y);
+      if (!lft || !rgt || !top || !bot) continue;
+      const rx2 = Math.abs(rgt.sx - lft.sx) / 2,
+        ry2 = Math.abs(bot.sy - top.sy) / 2;
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = Math.max(0.5, lw * hp.sc * 0.15);
+      ctx.beginPath();
+      ctx.ellipse(hp.sx, hp.sy, rx2, ry2, 0, 0, PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.fillStyle = th.buttonFill;
+    ctx.beginPath();
+    ctx.arc(hp.sx, hp.sy, Math.max(1.5, hp.sc * 1.2), 0, PI * 2);
+    ctx.fill();
+    if (th.houseCrosshairs) {
+      const cL = proj(WD.houseCenter.x, WD.houseCenter.y - 75),
+        cR = proj(WD.houseCenter.x, WD.houseCenter.y + 75),
+        cT = proj(WD.houseCenter.x - 75, WD.houseCenter.y),
+        cB = proj(WD.houseCenter.x + 75, WD.houseCenter.y);
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2;
+      if (cL && cR) {
+        ctx.beginPath();
+        ctx.moveTo(cL.sx, cL.sy);
+        ctx.lineTo(cR.sx, cR.sy);
+        ctx.stroke();
+      }
+      if (cT && cB) {
+        ctx.beginPath();
+        ctx.moveTo(cT.sx, cT.sy);
+        ctx.lineTo(cB.sx, cB.sy);
+        ctx.stroke();
+      }
+    }
+  }
+  const hk = proj(WD.hackPos, 0);
+  if (hk) {
+    const hw = hk.sc * 3;
+    ctx.fillStyle = th.hackFill;
+    ctx.fillRect(hk.sx - hw, hk.sy - 1, hw * 2, 3);
+  }
+  if (phase === "running" && deliveryRock?.inPlay && sweeping) {
+    const rp = proj(deliveryRock.x, deliveryRock.y),
+      hpp = proj(WD.houseCenter.x, 0);
+    if (rp && hpp) {
+      const cw = rp.sc * 18,
+        hw2 = hpp.sc * 40;
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = "#00e8e8";
+      ctx.beginPath();
+      ctx.moveTo(rp.sx - cw, rp.sy);
+      ctx.lineTo(hpp.sx - hw2, hpp.sy);
+      ctx.lineTo(hpp.sx + hw2, hpp.sy);
+      ctx.lineTo(rp.sx + cw, rp.sy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  const rd = rocks
+    .filter((r) => r.inPlay)
+    .map((r) => {
+      const p = proj(r.x, r.y, RR * 0.3);
+      return p ? { rock: r, p } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.p.d - a.p.d);
+  for (const { rock, p } of rd) {
+    const rr = Math.max(2, p.sc * RR * 1.05);
+    drawRockFn(
+      ctx,
+      p.sx,
+      p.sy,
+      rr,
+      th.teams[rock.team],
+      th,
+      rock.velocity > 0.1,
+    );
+  }
+  if (phase === "aiming" || phase === "power") {
+    const aN = proj(WD.hackPos, aimAngle),
+      aF = proj(WD.houseCenter.x, aimAngle);
+    if (aN && aF) {
+      const col = currentTeam === 0 ? "240,200,48" : "208,48,48";
+      ctx.strokeStyle = `rgba(${col},0.4)`;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([8, 5]);
+      ctx.beginPath();
+      ctx.moveTo(aN.sx, aN.sy);
+      ctx.lineTo(aF.sx, aF.sy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = `rgba(${col},0.8)`;
+      ctx.lineWidth = 1.5;
+      const tr = Math.max(4, aF.sc * 5);
+      ctx.beginPath();
+      ctx.arc(aF.sx, aF.sy, tr, 0, PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(aF.sx - tr * 1.5, aF.sy);
+      ctx.lineTo(aF.sx + tr * 1.5, aF.sy);
+      ctx.moveTo(aF.sx, aF.sy - tr * 1.5);
+      ctx.lineTo(aF.sx, aF.sy + tr * 1.5);
+      ctx.stroke();
+    }
+  }
+}
+
+// ============================================================
+// HOUSE ZOOM RENDERER
+// ============================================================
+function drawHouseZoom(ctx, W, H, state) {
+  const { WORLD: WD, ROCK_RADIUS: RR, rocks, theme: th } = state;
+  ctx.fillStyle = th.canvasBg;
+  ctx.fillRect(0, 0, W, H);
+  const vr = WD.houseRadii[3] + RR * 2 + 10,
+    sc = (Math.min(W, H) * 0.46) / vr,
+    cx = W / 2,
+    cy = H / 2;
+  const toS = (wx, wy) => [
+    cx + (wy - WD.houseCenter.y) * sc,
+    cy - (wx - WD.houseCenter.x) * sc,
+  ];
+  const r2s = (wr) => wr * sc;
+  ctx.fillStyle = th.sheetGradient[1];
+  ctx.fillRect(0, 0, W, H);
+  const e2 = WD.sheetHalfWidth;
+  const drawL = (wx, col, w) => {
+    const [x1, y1] = toS(wx, -e2),
+      [x2, y2] = toS(wx, e2);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  };
+  drawL(WD.tLine, th.tLine, th.lineWidth.tee);
+  drawL(WD.backLine, th.backLine, th.lineWidth.back);
+  ctx.strokeStyle = th.centerLine;
+  ctx.lineWidth = 1;
+  const [c1x, c1y] = toS(WD.houseCenter.x + vr, 0),
+    [c2x, c2y] = toS(WD.houseCenter.x - vr, 0);
+  ctx.beginPath();
+  ctx.moveTo(c1x, c1y);
+  ctx.lineTo(c2x, c2y);
+  ctx.stroke();
+  const [hcx, hcy] = toS(WD.houseCenter.x, WD.houseCenter.y);
+  drawHouseRings(ctx, hcx, hcy, r2s, th);
+  const maxD = vr + RR;
+  for (const rock of rocks) {
+    if (!rock.inPlay) continue;
+    const dx = rock.x - WD.houseCenter.x,
+      dy = rock.y - WD.houseCenter.y;
+    if (Math.sqrt(dx * dx + dy * dy) > maxD) continue;
+    const [rx, ry] = toS(rock.x, rock.y);
+    drawRockFn(
+      ctx,
+      rx,
+      ry,
+      r2s(RR) * 1.05,
+      th.teams[rock.team],
+      th,
+      rock.velocity > 0.1,
+    );
+  }
+  ctx.font = "bold 8px " + th.font;
+  ctx.fillStyle = th.dimText;
+  ctx.textAlign = "center";
+  ctx.fillText("HOUSE", W / 2, H - 4);
+  ctx.textAlign = "start";
+}
 
 function createCell() {
   return {
