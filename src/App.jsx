@@ -40,6 +40,137 @@ const DEFAULTS = {
   sweepBoost: 0.15,
 };
 
+// ============================================================
+// THEMES
+// ============================================================
+const THEMES = {
+  modern: {
+    name: "Modern",
+    // Page chrome
+    pageBg: "linear-gradient(145deg,#070b14 0%,#0d1525 40%,#111d33 100%)",
+    font: "'JetBrains Mono','SF Mono','Fira Code',monospace",
+    textColor: "#c8d8e8",
+    dimText: "#4a6080",
+    accentText: "#8ab4f8",
+    // Canvas
+    canvasBg: "#0a0f1a",
+    sheetGradient: ["#dce9f2", "#eaf4fa", "#d8e8f0"],
+    sheetRadius: 5,
+    pebbleDots: "rgba(180,200,215,0.06)",
+    // Lines
+    hogLine: "#cc223388",
+    tLine: "#33446666",
+    backLine: "#44557766",
+    centerLine: "#33446625",
+    lineWidth: { hog: 2.5, tee: 1.5, back: 2 },
+    // House
+    houseRings: [
+      [72, "rgba(30,90,180,0.15)", "rgba(30,90,180,0.30)", 1.5],
+      [48, "rgba(225,232,242,0.30)", "rgba(180,190,200,0.20)", 1.5],
+      [24, "rgba(200,40,40,0.15)", "rgba(200,40,40,0.25)", 1.5],
+      [6, "rgba(225,232,242,0.35)", "rgba(180,190,200,0.30)", 1.5],
+    ],
+    buttonFill: "#1a1a2e",
+    // Hack
+    hackFill: "#222",
+    // Rocks
+    teams: [
+      {
+        f: "#f0c830",
+        s: "#b8941e",
+        g: "rgba(240,200,48,0.28)",
+        name: "Yellow",
+      },
+      { f: "#d03030", s: "#8b1a1a", g: "rgba(208,48,48,0.28)", name: "Red" },
+    ],
+    rockStroke: "#555",
+    rockHandleWidth: 1.2,
+    rockGradient: true,
+    // UI chrome
+    btnBg: "rgba(255,255,255,0.05)",
+    btnBorder: "1px solid rgba(255,255,255,0.1)",
+    btnRadius: 3,
+    btnColor: "#8ab4f8",
+    panelBg: "rgba(255,255,255,0.03)",
+    panelBorder: "1px solid rgba(255,255,255,0.08)",
+    scoreBg: "rgba(255,255,255,0.03)",
+    scoreBorder: "1px solid rgba(255,255,255,0.06)",
+    canvasBorder: "1px solid rgba(255,255,255,0.06)",
+    // Title screen
+    titleBg: "rgba(7,11,20,0.88)",
+    titleGradient: "linear-gradient(135deg,#f0c830,#d03030)",
+    titleFont: 42,
+    titleWeight: 900,
+    startBtnBg:
+      "linear-gradient(135deg,rgba(240,200,48,0.15),rgba(208,48,48,0.15))",
+    // Overlays (scoring, gameover)
+    overlayBg: "rgba(7,11,20,0.75)",
+    // Sweep
+    sweepEmoji: true,
+  },
+  wincurl: {
+    name: "WinCurl 2.0",
+    // Page chrome — classic Win3.1 gray
+    pageBg: "#c0c0c0",
+    font: "'MS Sans Serif','Segoe UI','Tahoma',sans-serif",
+    textColor: "#000000",
+    dimText: "#808080",
+    accentText: "#000080",
+    // Canvas
+    canvasBg: "#404040",
+    sheetGradient: ["#e8e8e8", "#f0f0f0", "#e8e8e8"],
+    sheetRadius: 0,
+    pebbleDots: "rgba(200,200,200,0.08)",
+    // Lines — bold, solid
+    hogLine: "#cc0000",
+    tLine: "#000000",
+    backLine: "#000000",
+    centerLine: "#00000040",
+    lineWidth: { hog: 3, tee: 2, back: 2.5 },
+    // House — bold WinCurl saturated rings with thick black outlines
+    houseRings: [
+      [72, "rgba(0,0,200,0.7)", "#000000", 3],
+      [48, "rgba(255,255,255,0.95)", "#000000", 3],
+      [24, "rgba(220,0,0,0.7)", "#000000", 3],
+      [6, "rgba(255,255,255,0.95)", "#000000", 2],
+    ],
+    buttonFill: "#000000",
+    // Hack
+    hackFill: "#000000",
+    // Rocks — flat, bold
+    teams: [
+      { f: "#e0c020", s: "#000000", g: "rgba(224,192,32,0.3)", name: "Yellow" },
+      { f: "#d02020", s: "#000000", g: "rgba(208,32,32,0.3)", name: "Red" },
+    ],
+    rockStroke: "#000000",
+    rockHandleWidth: 2,
+    rockGradient: false,
+    // UI chrome — Win3.1 beveled
+    btnBg: "#c0c0c0",
+    btnBorder: "2px outset #ffffff",
+    btnRadius: 0,
+    btnColor: "#000000",
+    panelBg: "#c0c0c0",
+    panelBorder: "2px inset #808080",
+    scoreBg: "#c0c0c0",
+    scoreBorder: "2px inset #808080",
+    canvasBorder: "2px inset #808080",
+    // Title screen
+    titleBg: "rgba(0,0,128,0.92)",
+    titleGradient: "none",
+    titleFont: 32,
+    titleWeight: 700,
+    titleTextColor: "#ffffff",
+    startBtnBg: "#c0c0c0",
+    startBtnBorder: "2px outset #ffffff",
+    // Overlays
+    overlayBg: "rgba(0,0,128,0.80)",
+    // Sweep — cyan corridor like WinCurl
+    sweepEmoji: false,
+    sweepCorridor: true,
+  },
+};
+
 function createCell() {
   return {
     pebbleHeight: 1.0,
@@ -261,7 +392,7 @@ function createRock(team, id) {
   };
 }
 
-function Slider({ label, value, min, max, step, onChange }) {
+function Slider({ label, value, min, max, step, onChange, theme: th }) {
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}
@@ -269,7 +400,7 @@ function Slider({ label, value, min, max, step, onChange }) {
       <span
         style={{
           fontSize: 8,
-          color: "#6a8aaa",
+          color: th?.dimText || "#6a8aaa",
           minWidth: 72,
           textAlign: "right",
         }}
@@ -286,12 +417,17 @@ function Slider({ label, value, min, max, step, onChange }) {
         style={{
           flex: 1,
           height: 3,
-          accentColor: "#8ab4f8",
+          accentColor: th?.accentText || "#8ab4f8",
           cursor: "pointer",
         }}
       />
       <span
-        style={{ fontSize: 8, color: "#f0c830", minWidth: 40, fontWeight: 700 }}
+        style={{
+          fontSize: 8,
+          color: th?.textColor || "#f0c830",
+          minWidth: 40,
+          fontWeight: 700,
+        }}
       >
         {typeof value === "number"
           ? value.toFixed(step < 1 ? (step < 0.01 ? 3 : 2) : 0)
@@ -321,6 +457,8 @@ export default function CurlingGame() {
   const [showProfilePicker, setShowProfilePicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [themeName, setThemeName] = useState("modern");
+  const theme = THEMES[themeName] || THEMES.modern;
   const [tune, setTune] = useState({ ...DEFAULTS });
   const setT = (key, val) => setTune((prev) => ({ ...prev, [key]: val }));
   const rocksRef = useRef([]),
@@ -693,7 +831,8 @@ export default function CurlingGame() {
     };
 
     const draw = () => {
-      ctx.fillStyle = "#0a0f1a";
+      const th = theme;
+      ctx.fillStyle = th.canvasBg;
       ctx.fillRect(0, 0, W, H);
       const e = WORLD.sheetHalfWidth,
         tl = toS(WORLD.sheetStart, e),
@@ -705,12 +844,12 @@ export default function CurlingGame() {
       const gr = isV
         ? ctx.createLinearGradient(sL, sT2, sL, sT2 + sH)
         : ctx.createLinearGradient(sL, sT2, sL + sW, sT2);
-      gr.addColorStop(0, "#dce9f2");
-      gr.addColorStop(0.5, "#eaf4fa");
-      gr.addColorStop(1, "#d8e8f0");
+      gr.addColorStop(0, th.sheetGradient[0]);
+      gr.addColorStop(0.5, th.sheetGradient[1]);
+      gr.addColorStop(1, th.sheetGradient[2]);
       ctx.fillStyle = gr;
       ctx.beginPath();
-      ctx.roundRect(sL, sT2, sW, sH, 5);
+      ctx.roundRect(sL, sT2, sW, sH, th.sheetRadius);
       ctx.fill();
 
       if (showOverlay || phase === "running" || phase === "scoring") {
@@ -752,7 +891,7 @@ export default function CurlingGame() {
           }
       }
 
-      ctx.fillStyle = "rgba(180,200,215,0.06)";
+      ctx.fillStyle = th.pebbleDots;
       let seed = 42;
       const rnd = () => {
         seed = (seed * 16807) % 2147483647;
@@ -780,10 +919,10 @@ export default function CurlingGame() {
         ctx.lineTo(x2, y2);
         ctx.stroke();
       };
-      drawWL(WORLD.hogLine, "#cc223388", 2.5);
-      drawWL(WORLD.tLine, "#33446666", 1.5);
-      drawWL(WORLD.backLine, "#44557766", 2);
-      ctx.strokeStyle = "#33446625";
+      drawWL(WORLD.hogLine, th.hogLine, th.lineWidth.hog);
+      drawWL(WORLD.tLine, th.tLine, th.lineWidth.tee);
+      drawWL(WORLD.backLine, th.backLine, th.lineWidth.back);
+      ctx.strokeStyle = th.centerLine;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(...toS(WORLD.sheetStart, 0));
@@ -791,35 +930,39 @@ export default function CurlingGame() {
       ctx.stroke();
 
       const [hcx, hcy] = toS(WORLD.houseCenter.x, WORLD.houseCenter.y);
-      [
-        [72, "rgba(30,90,180,0.15)", "rgba(30,90,180,0.30)"],
-        [48, "rgba(225,232,242,0.30)", "rgba(180,190,200,0.20)"],
-        [24, "rgba(200,40,40,0.15)", "rgba(200,40,40,0.25)"],
-        [6, "rgba(225,232,242,0.35)", "rgba(180,190,200,0.30)"],
-      ].forEach(([r, f, s]) => {
+      th.houseRings.forEach(([r, f, s, lw]) => {
         ctx.fillStyle = f;
         ctx.strokeStyle = s;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = lw;
         ctx.beginPath();
         ctx.arc(hcx, hcy, r2s(r), 0, PI * 2);
         ctx.fill();
         ctx.stroke();
       });
-      ctx.fillStyle = "#1a1a2e";
+      ctx.fillStyle = th.buttonFill;
       ctx.beginPath();
       ctx.arc(hcx, hcy, Math.max(2, r2s(1.2)), 0, PI * 2);
       ctx.fill();
+      // WinCurl-style thick black crosshairs on the house
+      if (th === THEMES.wincurl) {
+        const cr = r2s(75);
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(hcx - cr, hcy);
+        ctx.lineTo(hcx + cr, hcy);
+        ctx.moveTo(hcx, hcy - cr);
+        ctx.lineTo(hcx, hcy + cr);
+        ctx.stroke();
+      }
 
       const [hkx, hky] = toS(WORLD.hackPos, 0);
       const hs = r2s(3);
-      ctx.fillStyle = "#222";
+      ctx.fillStyle = th.hackFill;
       if (isV) ctx.fillRect(hkx - hs * 2, hky - hs / 2, hs * 4, hs);
       else ctx.fillRect(hkx - hs / 2, hky - hs * 2, hs, hs * 4);
 
-      const tcA = [
-        { f: "#f0c830", s: "#b8941e", g: "rgba(240,200,48,0.28)" },
-        { f: "#d03030", s: "#8b1a1a", g: "rgba(208,48,48,0.28)" },
-      ];
+      const tcA = th.teams;
       for (const rock of rocksRef.current) {
         if (!rock.inPlay) continue;
         const [rx, ry] = toS(rock.x, rock.y);
@@ -835,26 +978,30 @@ export default function CurlingGame() {
         ctx.beginPath();
         ctx.arc(rx + 1, ry + 1, rr, 0, PI * 2);
         ctx.fill();
-        const rg = ctx.createRadialGradient(
-          rx - rr * 0.3,
-          ry - rr * 0.3,
-          rr * 0.1,
-          rx,
-          ry,
-          rr,
-        );
-        rg.addColorStop(0, "#fff");
-        rg.addColorStop(0.35, c.f);
-        rg.addColorStop(1, c.s);
-        ctx.fillStyle = rg;
+        if (th.rockGradient) {
+          const rg = ctx.createRadialGradient(
+            rx - rr * 0.3,
+            ry - rr * 0.3,
+            rr * 0.1,
+            rx,
+            ry,
+            rr,
+          );
+          rg.addColorStop(0, "#fff");
+          rg.addColorStop(0.35, c.f);
+          rg.addColorStop(1, c.s);
+          ctx.fillStyle = rg;
+        } else {
+          ctx.fillStyle = c.f;
+        }
         ctx.strokeStyle = c.s;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = th.rockGradient ? 1 : 2;
         ctx.beginPath();
         ctx.arc(rx, ry, rr, 0, PI * 2);
         ctx.fill();
         ctx.stroke();
-        ctx.strokeStyle = "#555";
-        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = th.rockStroke;
+        ctx.lineWidth = th.rockHandleWidth;
         ctx.beginPath();
         ctx.arc(rx, ry, rr * 0.4, 0, PI * 2);
         ctx.stroke();
@@ -969,16 +1116,44 @@ export default function CurlingGame() {
         sweepingRef.current
       ) {
         const dr = deliveryRockRef.current;
-        const [sx, sy] = toS(dr.x, dr.y);
-        ctx.fillStyle = "rgba(255,255,255,0.6)";
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(
-          "\uD83E\uDDF9",
-          sx,
-          sy - r2s(ROCK_RADIUS) - (showDebug ? 38 : 6),
-        );
-        ctx.textAlign = "start";
+        const [sx2, sy2] = toS(dr.x, dr.y);
+        if (th.sweepCorridor) {
+          // WinCurl-style cyan sweep corridor ahead of rock
+          const [hx2, hy2] = toS(WORLD.houseCenter.x, 0);
+          const rr2 = r2s(ROCK_RADIUS);
+          const corridorW = r2s(20);
+          ctx.save();
+          ctx.globalAlpha = 0.25;
+          ctx.fillStyle = "#00e8e8";
+          ctx.beginPath();
+          ctx.moveTo(sx2, sy2 - corridorW);
+          if (isV) {
+            ctx.lineTo(hx2, hy2 - corridorW * 2.5);
+            ctx.lineTo(hx2, hy2 + corridorW * 2.5);
+          } else {
+            ctx.lineTo(hx2, hy2 - corridorW * 2.5);
+            ctx.lineTo(hx2, hy2 + corridorW * 2.5);
+          }
+          ctx.lineTo(sx2, sy2 + corridorW);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = "#00e8e8";
+          ctx.font = "bold 8px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("SWEEP", sx2, sy2 - rr2 - 6);
+          ctx.textAlign = "start";
+        } else {
+          ctx.fillStyle = "rgba(255,255,255,0.6)";
+          ctx.font = "bold 10px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(
+            "\uD83E\uDDF9",
+            sx2,
+            sy2 - r2s(ROCK_RADIUS) - (showDebug ? 38 : 6),
+          );
+          ctx.textAlign = "start";
+        }
       }
 
       if (showOverlay) {
@@ -1019,7 +1194,16 @@ export default function CurlingGame() {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [phase, aimAngle, currentTeam, vertical, showOverlay, showDebug, tune]);
+  }, [
+    phase,
+    aimAngle,
+    currentTeam,
+    vertical,
+    showOverlay,
+    showDebug,
+    tune,
+    theme,
+  ]);
 
   const handleAction = useCallback(() => {
     if (phase === "title") {
@@ -1082,8 +1266,8 @@ export default function CurlingGame() {
   ]);
 
   const totalScore = (t) => scores[t].reduce((a, b) => a + b, 0);
-  const tn = (t) => (t === 0 ? "Yellow" : "Red");
-  const tCol = (t) => (t === 0 ? "#f0c830" : "#d03030");
+  const tn = (t) => theme.teams[t].name;
+  const tCol = (t) => theme.teams[t].f;
   const [dims, setDims] = useState({ w: 900, h: 500 });
   useEffect(() => {
     const resize = () => {
@@ -1106,11 +1290,11 @@ export default function CurlingGame() {
 
   const rockLabel = `${Math.floor(rockNum / 2) + 1}/${ROCKS_PER_TEAM}`;
   const btn = {
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: 3,
+    background: theme.btnBg,
+    border: theme.btnBorder,
+    borderRadius: theme.btnRadius,
     padding: "2px 8px",
-    color: "#8ab4f8",
+    color: theme.btnColor,
     fontSize: 9,
     fontWeight: 600,
     cursor: "pointer",
@@ -1121,13 +1305,12 @@ export default function CurlingGame() {
     <div
       style={{
         minHeight: "100vh",
-        background:
-          "linear-gradient(145deg,#070b14 0%,#0d1525 40%,#111d33 100%)",
+        background: theme.pageBg,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        fontFamily: "'JetBrains Mono','SF Mono','Fira Code',monospace",
-        color: "#c8d8e8",
+        fontFamily: theme.font,
+        color: theme.textColor,
         padding: "10px 14px",
         boxSizing: "border-box",
         userSelect: "none",
@@ -1150,9 +1333,14 @@ export default function CurlingGame() {
             margin: 0,
             fontSize: 18,
             fontWeight: 800,
-            background: "linear-gradient(135deg,#e8f0ff,#8ab4f8)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
+            background:
+              theme.titleGradient !== "none" ? theme.titleGradient : undefined,
+            WebkitBackgroundClip:
+              theme.titleGradient !== "none" ? "text" : undefined,
+            WebkitTextFillColor:
+              theme.titleGradient !== "none" ? "transparent" : undefined,
+            color:
+              theme.titleGradient === "none" ? theme.accentText : undefined,
           }}
         >
           CURLING
@@ -1176,13 +1364,13 @@ export default function CurlingGame() {
           </button>
           <button
             onClick={() => setShowOverlay((v) => !v)}
-            style={{ ...btn, color: showOverlay ? "#f0c830" : "#8ab4f8" }}
+            style={{ ...btn, color: showOverlay ? "#f0c830" : theme.btnColor }}
           >
             🧊
           </button>
           <button
             onClick={() => setShowDebug((v) => !v)}
-            style={{ ...btn, color: showDebug ? "#00ffcc" : "#8ab4f8" }}
+            style={{ ...btn, color: showDebug ? "#00ffcc" : theme.btnColor }}
           >
             🐛
           </button>
@@ -1191,9 +1379,17 @@ export default function CurlingGame() {
           </button>
           <button
             onClick={() => setShowAdvanced((v) => !v)}
-            style={{ ...btn, color: showAdvanced ? "#f0c830" : "#8ab4f8" }}
+            style={{ ...btn, color: showAdvanced ? "#f0c830" : theme.btnColor }}
           >
             🔧
+          </button>
+          <button
+            onClick={() =>
+              setThemeName((t) => (t === "modern" ? "wincurl" : "modern"))
+            }
+            style={{ ...btn, fontSize: 8 }}
+          >
+            🎨 {theme.name}
           </button>
         </div>
       </div>
@@ -1219,11 +1415,11 @@ export default function CurlingGame() {
               style={{
                 ...btn,
                 padding: "3px 8px",
-                color: iceProfile === k ? "#f0c830" : "#8ab4f8",
+                color: iceProfile === k ? "#f0c830" : theme.btnColor,
               }}
             >
               <div style={{ fontWeight: 700, fontSize: 8 }}>{p.name}</div>
-              <div style={{ fontSize: 6, color: "#4a6080", marginTop: 1 }}>
+              <div style={{ fontSize: 6, color: theme.dimText, marginTop: 1 }}>
                 {p.desc}
               </div>
             </button>
@@ -1236,9 +1432,9 @@ export default function CurlingGame() {
           style={{
             width: "100%",
             maxWidth: dims.w,
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 5,
+            background: theme.panelBg,
+            border: theme.panelBorder,
+            borderRadius: theme.btnRadius + 2,
             padding: "8px 10px",
             marginBottom: 4,
           }}
@@ -1251,7 +1447,9 @@ export default function CurlingGame() {
               marginBottom: 4,
             }}
           >
-            <span style={{ fontSize: 9, fontWeight: 700, color: "#8ab4f8" }}>
+            <span
+              style={{ fontSize: 9, fontWeight: 700, color: theme.accentText }}
+            >
               PHYSICS TUNING
             </span>
             <button
@@ -1274,6 +1472,7 @@ export default function CurlingGame() {
               min={0}
               max={200}
               step={1}
+              theme={theme}
               onChange={(v) => setT("curlCoeff", v)}
             />
             <Slider
@@ -1282,6 +1481,7 @@ export default function CurlingGame() {
               min={0}
               max={50}
               step={0.5}
+              theme={theme}
               onChange={(v) => setT("gradientCoeff", v)}
             />
             <Slider
@@ -1290,6 +1490,7 @@ export default function CurlingGame() {
               min={0}
               max={80}
               step={1}
+              theme={theme}
               onChange={(v) => setT("slopeGravity", v)}
             />
             <Slider
@@ -1298,6 +1499,7 @@ export default function CurlingGame() {
               min={1}
               max={30}
               step={0.5}
+              theme={theme}
               onChange={(v) => setT("frictionDecel", v)}
             />
             <Slider
@@ -1306,6 +1508,7 @@ export default function CurlingGame() {
               min={0.01}
               max={0.2}
               step={0.005}
+              theme={theme}
               onChange={(v) => setT("baseFriction", v)}
             />
             <Slider
@@ -1314,6 +1517,7 @@ export default function CurlingGame() {
               min={0}
               max={0.2}
               step={0.005}
+              theme={theme}
               onChange={(v) => setT("pebbleFrictionBonus", v)}
             />
             <Slider
@@ -1322,6 +1526,7 @@ export default function CurlingGame() {
               min={20}
               max={120}
               step={1}
+              theme={theme}
               onChange={(v) => setT("speedScale", v)}
             />
             <Slider
@@ -1330,6 +1535,7 @@ export default function CurlingGame() {
               min={0}
               max={0.01}
               step={0.0005}
+              theme={theme}
               onChange={(v) => setT("wearRate", v)}
             />
             <Slider
@@ -1338,6 +1544,7 @@ export default function CurlingGame() {
               min={0}
               max={1}
               step={0.05}
+              theme={theme}
               onChange={(v) => setT("sweepBoost", v)}
             />
           </div>
@@ -1350,9 +1557,9 @@ export default function CurlingGame() {
             display: "flex",
             gap: 2,
             marginBottom: 4,
-            background: "rgba(255,255,255,0.03)",
-            borderRadius: 5,
-            border: "1px solid rgba(255,255,255,0.06)",
+            background: theme.scoreBg,
+            borderRadius: theme.btnRadius + 2,
+            border: theme.scoreBorder,
             overflow: "hidden",
             fontSize: 10,
             width: "100%",
@@ -1373,8 +1580,7 @@ export default function CurlingGame() {
                   phase !== "gameover"
                     ? `${tCol(t)}15`
                     : "transparent",
-                borderLeft:
-                  t === 1 ? "1px solid rgba(255,255,255,0.06)" : "none",
+                borderLeft: t === 1 ? theme.scoreBorder : "none",
               }}
             >
               <div
@@ -1394,11 +1600,11 @@ export default function CurlingGame() {
                   <span
                     key={i}
                     style={{
-                      background: "rgba(255,255,255,0.06)",
+                      background: theme.btnBg,
                       padding: "0 3px",
                       borderRadius: 2,
                       fontWeight: s > 0 ? 700 : 400,
-                      color: s > 0 ? tCol(t) : "#4a6080",
+                      color: s > 0 ? tCol(t) : theme.dimText,
                       fontSize: 8,
                     }}
                   >
@@ -1430,9 +1636,9 @@ export default function CurlingGame() {
           height={dims.h}
           onClick={handleAction}
           style={{
-            borderRadius: 8,
+            borderRadius: theme.btnRadius + 5,
             cursor: "pointer",
-            border: "1px solid rgba(255,255,255,0.06)",
+            border: theme.canvasBorder,
             display: "block",
           }}
         />
@@ -1446,28 +1652,36 @@ export default function CurlingGame() {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              background: "rgba(7,11,20,0.88)",
-              borderRadius: 8,
+              background: theme.titleBg,
+              borderRadius: theme.btnRadius + 5,
               cursor: "pointer",
             }}
             onClick={handleAction}
           >
             <div
               style={{
-                fontSize: 42,
-                fontWeight: 900,
+                fontSize: theme.titleFont,
+                fontWeight: theme.titleWeight,
                 letterSpacing: "-2px",
-                background: "linear-gradient(135deg,#f0c830,#d03030)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
+                background:
+                  theme.titleGradient !== "none"
+                    ? theme.titleGradient
+                    : undefined,
+                WebkitBackgroundClip:
+                  theme.titleGradient !== "none" ? "text" : undefined,
+                WebkitTextFillColor:
+                  theme.titleGradient !== "none" ? "transparent" : undefined,
+                color: theme.titleTextColor || undefined,
                 marginBottom: 4,
               }}
             >
-              CURLING
+              {themeName === "wincurl" ? "WinCurl 2.0" : "CURLING"}
             </div>
-            <div style={{ fontSize: 8, color: "#4a6080", marginBottom: 12 }}>
+            <div
+              style={{ fontSize: 8, color: theme.dimText, marginBottom: 12 }}
+            >
               Ice:{" "}
-              <b style={{ color: "#8ab4f8" }}>
+              <b style={{ color: theme.accentText }}>
                 {ICE_PROFILES[iceProfile].name}
               </b>{" "}
               — {ICE_PROFILES[iceProfile].desc}
@@ -1475,13 +1689,14 @@ export default function CurlingGame() {
             <div
               style={{
                 padding: "8px 28px",
-                background:
-                  "linear-gradient(135deg,rgba(240,200,48,0.15),rgba(208,48,48,0.15))",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 5,
+                background: theme.startBtnBg,
+                border:
+                  theme.startBtnBorder || `1px solid rgba(255,255,255,0.12)`,
+                borderRadius: theme.btnRadius,
                 fontSize: 11,
                 fontWeight: 600,
                 letterSpacing: "1px",
+                color: theme.titleTextColor || theme.textColor,
               }}
             >
               TAP TO START
@@ -1498,13 +1713,15 @@ export default function CurlingGame() {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              background: "rgba(7,11,20,0.75)",
-              borderRadius: 8,
+              background: theme.overlayBg,
+              borderRadius: theme.btnRadius + 5,
               cursor: "pointer",
             }}
             onClick={handleAction}
           >
-            <div style={{ fontSize: 12, color: "#6a8aaa", marginBottom: 4 }}>
+            <div
+              style={{ fontSize: 12, color: theme.dimText, marginBottom: 4 }}
+            >
               End {currentEnd}
             </div>
             {endScoreDisplay.scoringTeam >= 0 ? (
@@ -1518,11 +1735,13 @@ export default function CurlingGame() {
                 {tn(endScoreDisplay.scoringTeam)} scores {endScoreDisplay.pts}!
               </div>
             ) : (
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#6a8aaa" }}>
+              <div
+                style={{ fontSize: 16, fontWeight: 700, color: theme.dimText }}
+              >
                 Blank end
               </div>
             )}
-            <div style={{ marginTop: 10, fontSize: 9, color: "#4a6080" }}>
+            <div style={{ marginTop: 10, fontSize: 9, color: theme.dimText }}>
               Tap to continue
             </div>
           </div>
@@ -1537,13 +1756,15 @@ export default function CurlingGame() {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              background: "rgba(7,11,20,0.85)",
-              borderRadius: 8,
+              background: theme.overlayBg,
+              borderRadius: theme.btnRadius + 5,
               cursor: "pointer",
             }}
             onClick={handleAction}
           >
-            <div style={{ fontSize: 12, color: "#6a8aaa", marginBottom: 4 }}>
+            <div
+              style={{ fontSize: 12, color: theme.dimText, marginBottom: 4 }}
+            >
               Final Score
             </div>
             <div style={{ display: "flex", gap: 20, marginBottom: 10 }}>
@@ -1554,7 +1775,9 @@ export default function CurlingGame() {
                   >
                     {totalScore(t)}
                   </div>
-                  <div style={{ fontSize: 10, color: "#6a8aaa" }}>{tn(t)}</div>
+                  <div style={{ fontSize: 10, color: theme.dimText }}>
+                    {tn(t)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1567,7 +1790,7 @@ export default function CurlingGame() {
                     ? tCol(0)
                     : totalScore(1) > totalScore(0)
                       ? tCol(1)
-                      : "#6a8aaa",
+                      : theme.dimText,
               }}
             >
               {totalScore(0) > totalScore(1)
@@ -1576,7 +1799,7 @@ export default function CurlingGame() {
                   ? "Red Wins!"
                   : "Draw!"}
             </div>
-            <div style={{ marginTop: 10, fontSize: 9, color: "#4a6080" }}>
+            <div style={{ marginTop: 10, fontSize: 9, color: theme.dimText }}>
               Tap to play again
             </div>
           </div>
@@ -1600,7 +1823,7 @@ export default function CurlingGame() {
             fontSize: 9,
             fontWeight: 600,
             padding: "2px 8px",
-            borderRadius: 3,
+            borderRadius: theme.btnRadius,
             background: `${tCol(currentTeam)}18`,
             border: `1px solid ${tCol(currentTeam)}30`,
             color: tCol(currentTeam),
@@ -1623,10 +1846,10 @@ export default function CurlingGame() {
               flex: 1,
               minWidth: 80,
               height: 12,
-              background: "rgba(255,255,255,0.04)",
-              borderRadius: 3,
+              background: theme.btnBg,
+              borderRadius: theme.btnRadius,
               overflow: "hidden",
-              border: "1px solid rgba(255,255,255,0.06)",
+              border: theme.btnBorder,
               position: "relative",
             }}
           >
@@ -1640,7 +1863,7 @@ export default function CurlingGame() {
                     : power < 75
                       ? "rgba(240,200,48,0.4)"
                       : "rgba(208,48,48,0.4)",
-                borderRadius: 3,
+                borderRadius: theme.btnRadius,
               }}
             />
             <span
@@ -1651,7 +1874,7 @@ export default function CurlingGame() {
                 transform: "translate(-50%,-50%)",
                 fontSize: 7,
                 fontWeight: 700,
-                color: "#c8d8e8",
+                color: theme.textColor,
               }}
             >
               {Math.round(power)}%
@@ -1664,7 +1887,7 @@ export default function CurlingGame() {
               e.stopPropagation();
               setCurlDir((d) => d * -1);
             }}
-            style={{ ...btn, color: "#c8d8e8" }}
+            style={{ ...btn, color: theme.textColor }}
           >
             {curlDir > 0 ? "↻ CW (right)" : "↺ CCW (left)"}
           </button>
@@ -1673,18 +1896,20 @@ export default function CurlingGame() {
           <div
             style={{
               fontSize: 9,
-              color: sweepingRef.current ? "#8ef" : "#4a6080",
+              color: sweepingRef.current ? theme.accentText : theme.dimText,
               fontWeight: sweepingRef.current ? 700 : 400,
             }}
           >
-            {sweepingRef.current ? "🧹 SWEEPING" : "Tap to sweep"}
+            {sweepingRef.current
+              ? (theme.sweepEmoji ? "🧹 " : "") + "SWEEPING"
+              : "Tap to sweep"}
           </div>
         )}
       </div>
       <div
         style={{
           fontSize: 7,
-          color: "#2a3a50",
+          color: theme.dimText,
           marginTop: 3,
           textAlign: "center",
           maxWidth: 400,
