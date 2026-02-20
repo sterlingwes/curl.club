@@ -793,6 +793,7 @@ function Slider({ label, value, min, max, step, onChange, theme: th }) {
 
 export default function CurlingGame() {
   const canvasRef = useRef(null),
+    perspCanvasRef = useRef(null),
     animRef = useRef(null),
     iceGridRef = useRef(new IceGrid());
   const [phase, setPhase] = useState("title");
@@ -805,7 +806,8 @@ export default function CurlingGame() {
   const [aimAngle, setAimAngle] = useState(0);
   const [power, setPower] = useState(0);
   const [curlDir, setCurlDir] = useState(1);
-  const [vertical, setVertical] = useState(false);
+  // Vertical-only mode - horizontal mode removed
+  const [isNarrowLayout, setIsNarrowLayout] = useState(true);
   const [iceProfile, setIceProfile] = useState("club");
   const [showOverlay, setShowOverlay] = useState(false);
   const [showProfilePicker, setShowProfilePicker] = useState(false);
@@ -1020,14 +1022,14 @@ export default function CurlingGame() {
     rock.y = aimAngle;
     rock.angle = PI;
     rock.velocity = 1.8 + 2.6 * Math.pow(power / 100, 0.5);
-    rock.spin = vertical ? curlDir : -curlDir;
+    rock.spin = curlDir; // Fixed: vertical mode only, no flip needed
     rock.paperTurns = 0.8 + Math.random() * 0.4;
     rock.inPlay = true;
     rock.active = true;
     rock.stopped = false;
     rock.hasContacted = false;
     deliveryRockRef.current = rock;
-  }, [currentTeam, rockNum, aimAngle, power, curlDir, vertical]);
+  }, [currentTeam, rockNum, aimAngle, power, curlDir]);
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -1092,31 +1094,41 @@ export default function CurlingGame() {
     return () => clearInterval(iv);
   }, [phase]);
 
+  // Breakpoint detection for layout (narrow < 500px, wide >= 500px)
+  useEffect(() => {
+    const checkBreakpoint = () => {
+      setIsNarrowLayout(window.innerWidth < 500);
+    };
+    checkBreakpoint();
+    window.addEventListener("resize", checkBreakpoint);
+    return () => window.removeEventListener("resize", checkBreakpoint);
+  }, []);
+
   // === RENDERING ===
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const perspCanvas = perspCanvasRef.current;
+    if (!canvas || !perspCanvas) return;
     const ctx = canvas.getContext("2d");
+    const perspCtx = perspCanvas.getContext("2d");
     let raf;
     const W = canvas.width,
       H = canvas.height,
-      isV = vertical;
+      // Hardcoded vertical mode: world +y goes to right (screen +x)
+      isV = true;
     const xRange = WORLD.sheetStart - WORLD.sheetEnd,
       yRange = WORLD.sheetHalfWidth * 2;
     const uScale = Math.min(
-      ((isV ? H : W) * 0.92) / xRange,
-      ((isV ? W : H) * 0.92) / yRange,
+      (H * 0.92) / xRange,
+      (W * 0.92) / yRange,
     );
     const wcx = (WORLD.sheetStart + WORLD.sheetEnd) / 2;
-    const toS = (wx, wy) =>
-      isV
-        ? [W / 2 + wy * uScale, H / 2 + (wx - wcx) * uScale]
-        : [W / 2 - (wx - wcx) * uScale, H / 2 - wy * uScale];
+    const toS = (wx, wy) => [W / 2 + wy * uScale, H / 2 + (wx - wcx) * uScale];
     const r2s = (wr) => wr * uScale;
     const T = tune,
       grid = iceGridRef.current;
-    // World +y force → screen delta. Horiz: +y → up (screen -y). Vert: +y → right (screen +x).
-    const fToS = (fy, sc) => (isV ? [fy * sc, 0] : [0, -fy * sc]);
+    // World +y force → screen delta. Vert: +y → right (screen +x).
+    const fToS = (fy, sc) => [fy * sc, 0];
 
     const buildOverlay = () => {
       const oc = document.createElement("canvas");
@@ -1211,15 +1223,10 @@ export default function CurlingGame() {
         ctx.save();
         ctx.imageSmoothingEnabled = true;
         ctx.globalAlpha = showOverlay ? 0.85 : 0.5;
-        if (isV) {
-          ctx.translate(sL, sT2 + sH);
-          ctx.rotate(-PI / 2);
-          ctx.drawImage(oImg, 0, 0, GRID_COLS, GRID_ROWS, 0, 0, sH, sW);
-        } else {
-          ctx.translate(sL + sW, sT2 + sH);
-          ctx.scale(-1, -1);
-          ctx.drawImage(oImg, 0, 0, GRID_COLS, GRID_ROWS, 0, 0, sW, sH);
-        }
+        // Vertical mode: translate to top-left and rotate
+        ctx.translate(sL, sT2 + sH);
+        ctx.rotate(-PI / 2);
+        ctx.drawImage(oImg, 0, 0, GRID_COLS, GRID_ROWS, 0, 0, sH, sW);
         ctx.restore();
       }
       if (showOverlay) {
@@ -1233,7 +1240,8 @@ export default function CurlingGame() {
             const [sx, sy] = toS(wx, wy);
             const len = Math.min(12, mag * 3000);
             const ang = Math.atan2(cell.slopeY, cell.slopeX);
-            const sa = isV ? -ang + PI / 2 : PI - ang;
+            // Vertical mode: -ang + PI/2
+            const sa = -ang + PI / 2;
             const ex = sx + Math.cos(sa) * len,
               ey = sy - Math.sin(sa) * len;
             ctx.strokeStyle = `rgba(255,220,80,${Math.min(0.8, mag * 250)})`;
@@ -1313,8 +1321,8 @@ export default function CurlingGame() {
       const [hkx, hky] = toS(WORLD.hackPos, 0);
       const hs = r2s(3);
       ctx.fillStyle = th.hackFill;
-      if (isV) ctx.fillRect(hkx - hs * 2, hky - hs / 2, hs * 4, hs);
-      else ctx.fillRect(hkx - hs / 2, hky - hs * 2, hs, hs * 4);
+      // Vertical mode: horizontal hack line
+      ctx.fillRect(hkx - hs * 2, hky - hs / 2, hs * 4, hs);
 
       const tcA = th.teams;
       for (const rock of rocksRef.current) {
@@ -1481,13 +1489,8 @@ export default function CurlingGame() {
           ctx.fillStyle = "#00e8e8";
           ctx.beginPath();
           ctx.moveTo(sx2, sy2 - corridorW);
-          if (isV) {
-            ctx.lineTo(hx2, hy2 - corridorW * 2.5);
-            ctx.lineTo(hx2, hy2 + corridorW * 2.5);
-          } else {
-            ctx.lineTo(hx2, hy2 - corridorW * 2.5);
-            ctx.lineTo(hx2, hy2 + corridorW * 2.5);
-          }
+          ctx.lineTo(hx2, hy2 - corridorW * 2.5);
+          ctx.lineTo(hx2, hy2 + corridorW * 2.5);
           ctx.lineTo(sx2, sy2 + corridorW);
           ctx.closePath();
           ctx.fill();
@@ -1544,6 +1547,24 @@ export default function CurlingGame() {
         ctx.fillText("arrow len = force magnitude", lx + 4, ly + 52);
       }
 
+      // Render perspective view
+      drawPerspective(
+        perspCtx,
+        perspDims.w,
+        perspDims.h,
+        {
+          WORLD,
+          ROCK_RADIUS,
+          rocks: rocksRef.current,
+          deliveryRock: deliveryRockRef.current,
+          sweeping: sweepingRef.current,
+          phase,
+          aimAngle,
+          currentTeam,
+          theme: th,
+        },
+      );
+
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
@@ -1552,7 +1573,6 @@ export default function CurlingGame() {
     phase,
     aimAngle,
     currentTeam,
-    vertical,
     showOverlay,
     showDebug,
     tune,
@@ -1622,25 +1642,43 @@ export default function CurlingGame() {
   const totalScore = (t) => scores[t].reduce((a, b) => a + b, 0);
   const tn = (t) => theme.teams[t].name;
   const tCol = (t) => theme.teams[t].f;
+  // Main canvas dimensions (top-down minimap)
   const [dims, setDims] = useState({ w: 900, h: 500 });
+  // Perspective canvas dimensions - grows to fill available space
+  const [perspDims, setPerspDims] = useState({ w: 400, h: 400 });
+
+  // Sheet aspect ratio (width:height ratio for the ice sheet)
+  const SHEET_ASPECT = (WORLD.sheetStart - WORLD.sheetEnd) / (WORLD.sheetHalfWidth * 2);
+
   useEffect(() => {
     const resize = () => {
       const mw = Math.min(window.innerWidth - 24, 1100),
         mh = window.innerHeight - 260;
-      if (vertical) {
-        const w = Math.min(mw, 400),
-          h = Math.min(mh, w * 2.4);
-        setDims({ w: Math.max(260, w), h: Math.max(380, h) });
+
+      if (isNarrowLayout) {
+        // Narrow: stack vertically, perspective takes remaining space
+        const sheetW = Math.min(mw, 400);
+        const sheetH = Math.min(mh * 0.5, sheetW * SHEET_ASPECT);
+        setDims({ w: Math.max(260, sheetW), h: Math.max(200, sheetH) });
+
+        const pw = Math.min(mw, 400);
+        const ph = Math.min(mh * 0.45, pw * 0.6);
+        setPerspDims({ w: Math.max(260, pw), h: Math.max(180, ph) });
       } else {
-        const w = Math.min(mw, 1100),
-          h = Math.min(w * 0.36, mh);
-        setDims({ w: Math.max(460, w), h: Math.max(180, h) });
+        // Wide: side-by-side, both views fill space reasonably
+        const sheetW = Math.min(mw * 0.45, 350);
+        const sheetH = Math.min(mh, sheetW * SHEET_ASPECT);
+        setDims({ w: Math.max(250, sheetW), h: Math.max(180, sheetH) });
+
+        const pw = mw - sheetW - 8; // perspective takes remaining width
+        const ph = Math.min(mh, pw * 0.6);
+        setPerspDims({ w: Math.max(350, pw), h: Math.max(250, ph) });
       }
     };
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [vertical]);
+  }, [isNarrowLayout]);
 
   const rockLabel = `${Math.floor(rockNum / 2) + 1}/${ROCKS_PER_TEAM}`;
   const btn = {
@@ -1677,7 +1715,7 @@ export default function CurlingGame() {
           gap: 8,
           marginBottom: 4,
           width: "100%",
-          maxWidth: dims.w,
+          maxWidth: isNarrowLayout ? dims.w : dims.w + perspDims.w + 8,
           justifyContent: "space-between",
           flexWrap: "wrap",
         }}
@@ -1713,9 +1751,6 @@ export default function CurlingGame() {
               E<b>{currentEnd}</b> R<b>{rockLabel}</b>
             </span>
           )}
-          <button onClick={() => setVertical((v) => !v)} style={btn}>
-            {vertical ? "⟷" : "⟳"}
-          </button>
           <button
             onClick={() => setShowOverlay((v) => !v)}
             style={{ ...btn, color: showOverlay ? "#f0c830" : theme.btnColor }}
@@ -1756,7 +1791,7 @@ export default function CurlingGame() {
             marginBottom: 4,
             flexWrap: "wrap",
             width: "100%",
-            maxWidth: dims.w,
+            maxWidth: isNarrowLayout ? dims.w : dims.w + perspDims.w + 8,
           }}
         >
           {Object.entries(ICE_PROFILES).map(([k, p]) => (
@@ -1785,7 +1820,7 @@ export default function CurlingGame() {
         <div
           style={{
             width: "100%",
-            maxWidth: dims.w,
+            maxWidth: isNarrowLayout ? dims.w : dims.w + perspDims.w + 8,
             background: theme.panelBg,
             border: theme.panelBorder,
             borderRadius: theme.btnRadius + 2,
@@ -1917,7 +1952,7 @@ export default function CurlingGame() {
             overflow: "hidden",
             fontSize: 10,
             width: "100%",
-            maxWidth: dims.w,
+            maxWidth: isNarrowLayout ? dims.w : dims.w + perspDims.w + 8,
           }}
         >
           {[0, 1].map((t) => (
@@ -1982,20 +2017,66 @@ export default function CurlingGame() {
       )}
 
       <div
-        style={{ position: "relative", borderRadius: 8, overflow: "hidden" }}
+        style={{
+          display: "flex",
+          gap: 8,
+          position: "relative",
+          borderRadius: 8,
+          overflow: "hidden",
+          flexWrap: isNarrowLayout ? "wrap" : "nowrap",
+          minHeight: isNarrowLayout ? 600 : 400,
+        }}
       >
-        <canvas
-          ref={canvasRef}
-          width={dims.w}
-          height={dims.h}
-          onClick={handleAction}
+        {/* Top-down minimap canvas */}
+        <div
           style={{
+            position: "relative",
             borderRadius: theme.btnRadius + 5,
-            cursor: "pointer",
-            border: theme.canvasBorder,
-            display: "block",
+            overflow: "hidden",
+            flex: isNarrowLayout ? "0 0 auto" : "0 0 auto",
+            display: "flex",
+            alignItems: "center",
           }}
-        />
+        >
+          <canvas
+            ref={canvasRef}
+            width={dims.w}
+            height={dims.h}
+            onClick={handleAction}
+            style={{
+              borderRadius: theme.btnRadius + 5,
+              cursor: "pointer",
+              border: theme.canvasBorder,
+              display: "block",
+              width: isNarrowLayout ? "auto" : "100%",
+            }}
+          />
+        </div>
+
+        {/* Perspective canvas - 3D view from hack, grows to fill space */}
+        <div
+          style={{
+            position: "relative",
+            borderRadius: theme.btnRadius + 5,
+            overflow: "hidden",
+            flex: isNarrowLayout ? "1 1 auto" : "1 1 auto",
+            minWidth: isNarrowLayout ? 0 : perspDims.w,
+          }}
+        >
+          <canvas
+            ref={perspCanvasRef}
+            width={perspDims.w}
+            height={perspDims.h}
+            onClick={handleAction}
+            style={{
+              borderRadius: theme.btnRadius + 5,
+              cursor: "pointer",
+              border: theme.canvasBorder,
+              display: "block",
+              width: "100%",
+            }}
+          />
+        </div>
 
         {phase === "title" && (
           <div
@@ -2167,7 +2248,7 @@ export default function CurlingGame() {
           gap: 8,
           marginTop: 5,
           width: "100%",
-          maxWidth: dims.w,
+          maxWidth: isNarrowLayout ? dims.w : dims.w + perspDims.w + 8,
           minHeight: 34,
           flexWrap: "wrap",
         }}
