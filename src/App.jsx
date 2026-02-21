@@ -419,9 +419,52 @@ function drawPerspective(ctx, W, H, state) {
     })
     .filter(Boolean)
     .sort((a, b) => b.p.d - a.p.d);
+
+  // Perspective-aware rock drawing - renders 3D rocks as viewed from hack
+  const drawRockPerspective = (ctx, rx, ry, rr, c, th, moving, scale) => {
+    // Flattening factor - rocks appear more elliptical as they get farther
+    const flat = 0.4; // vertical flattening for 3D perspective
+    const height = rr * 0.25 * scale; // apparent height of rock above ice
+
+    // Rock body - granite appearance (mostly grey/dark from this angle)
+    if (th.rockGradient) {
+      // Simple highlight on top edge (subtle, consistent)
+      ctx.fillStyle = c.f;
+      ctx.beginPath();
+      ctx.ellipse(rx, ry - height * 0.5, rr * 0.85, rr * flat * 0.85, 0, 0, PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = "#333340"; // dark grey granite
+    }
+
+    // Main rock body ellipse - FIXED stroke width
+    ctx.strokeStyle = c.s;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(rx, ry - height * 0.3, rr, rr * flat, 0, 0, PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Top rim highlight - shows the cylindrical edge facing toward viewer
+    ctx.fillStyle = "rgba(255,255,255,0.15)";
+    ctx.beginPath();
+    ctx.ellipse(rx, ry - height * 0.5, rr * 0.85, rr * flat * 0.85, 0, 0, PI * 2);
+    ctx.fill();
+
+    // Handle - much smaller, very subtle from behind angle
+    const handleR = rr * 0.14; // much smaller handle (we're viewing from behind/above)
+    ctx.fillStyle = c.f;
+    ctx.strokeStyle = th.rockStroke;
+    ctx.lineWidth = th.rockHandleWidth * scale * 0.5;
+    ctx.beginPath();
+    ctx.ellipse(rx, ry - height * 0.5, handleR, handleR * flat, 0, 0, PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  };
+
   for (const { rock, p } of rd) {
     const rr = Math.max(2, p.sc * RR * 1.05);
-    drawRockFn(
+    drawRockPerspective(
       ctx,
       p.sx,
       p.sy,
@@ -429,6 +472,7 @@ function drawPerspective(ctx, W, H, state) {
       th.teams[rock.team],
       th,
       rock.velocity > 0.1,
+      p.sc,
     );
   }
   if (phase === "aiming" || phase === "power") {
