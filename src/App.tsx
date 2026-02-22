@@ -1,4 +1,160 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+
+// ============================================================
+// TYPE DEFINITIONS
+// ============================================================
+
+interface World {
+  sheetHalfWidth: number;
+  sheetStart: number;
+  sheetEnd: number;
+  hogLine: number;
+  tLine: number;
+  backLine: number;
+  hackPos: number;
+  houseCenter: { x: number; y: number };
+  houseRadii: [number, number, number, number];
+}
+
+interface Team {
+  f: string;
+  s: string;
+  g: string;
+  name: string;
+}
+
+interface LineWidth {
+  hog: number;
+  tee: number;
+  back: number;
+}
+
+type HouseRing = [number, string, string, number];
+
+interface Theme {
+  name: string;
+  pageBg: string;
+  font: string;
+  textColor: string;
+  dimText: string;
+  accentText: string;
+  canvasBg: string;
+  sheetGradient: [string, string, string];
+  sheetRadius: number;
+  pebbleDots: string;
+  hogLine: string;
+  tLine: string;
+  backLine: string;
+  centerLine: string;
+  lineWidth: LineWidth;
+  houseRings: [HouseRing, HouseRing, HouseRing, HouseRing];
+  buttonFill: string;
+  houseCrosshairs: boolean;
+  hackFill: string;
+  teams: [Team, Team];
+  rockStroke: string;
+  rockHandleWidth: number;
+  rockGradient: boolean;
+  btnBg: string;
+  btnBorder: string;
+  btnRadius: number;
+  btnColor: string;
+  panelBg: string;
+  panelBorder: string;
+  scoreBg: string;
+  scoreBorder: string;
+  canvasBorder: string;
+  titleBg: string;
+  titleGradient: string;
+  titleFont: number;
+  titleWeight: number;
+  titleTextColor?: string;
+  startBtnBg: string;
+  startBtnBorder?: string;
+  overlayBg: string;
+  sweepEmoji: boolean;
+  sweepCorridor?: boolean;
+}
+
+interface PhysicsTune {
+  baseFriction: number;
+  pebbleFrictionBonus: number;
+  curlCoeff: number;
+  gradientCoeff: number;
+  slopeGravity: number;
+  frictionDecel: number;
+  speedScale: number;
+  wearRate: number;
+  sweepBoost: number;
+}
+
+interface Cell {
+  pebbleHeight: number;
+  temperature: number;
+  moisture: number;
+  slopeX: number;
+  slopeY: number;
+}
+
+interface RockDebug {
+  friction: number;
+  vFactor: number;
+  fL: number;
+  fR: number;
+  v: number;
+  spin: number;
+  spinCurl: number;
+  gradDrift: number;
+  slopeY: number;
+  slopeX: number;
+}
+
+interface Rock {
+  id: number;
+  team: number;
+  x: number;
+  y: number;
+  angle: number;
+  velocity: number;
+  spin: number;
+  paperTurns: number;
+  inPlay: boolean;
+  active: boolean;
+  stopped: boolean;
+  hasContacted: boolean;
+  dbg: RockDebug;
+}
+
+type GamePhase =
+  | "title"
+  | "aiming"
+  | "power"
+  | "running"
+  | "scoring"
+  | "gameover";
+
+interface EndScore {
+  scoringTeam: number;
+  pts: number;
+}
+
+interface IceProfile {
+  name: string;
+  desc: string;
+  init: (grid: IceGrid) => void;
+}
+
+type ThemeName = "modern" | "wincurl";
+type IceProfileKey = "championship" | "club" | "arena" | "swingy" | "discovery";
+
+interface Dimensions {
+  w: number;
+  h: number;
+}
+
+// ============================================================
+// CONSTANTS
+// ============================================================
 
 const PI = Math.PI;
 const ROCK_RADIUS = 5;
@@ -6,7 +162,7 @@ const RESTITUTION = 0.92;
 const ROCKS_PER_TEAM = 8;
 const ROCKS_PER_END = ROCKS_PER_TEAM * 2;
 
-const WORLD = {
+const WORLD: World = {
   sheetHalfWidth: 82,
   sheetStart: 50,
   sheetEnd: -680,
@@ -28,7 +184,7 @@ const CELL_W = (GRID_X_MAX - GRID_X_MIN) / GRID_COLS;
 const CELL_H = (GRID_Y_MAX - GRID_Y_MIN) / GRID_ROWS;
 const CURL_SAMPLE_OFFSET = ROCK_RADIUS * 0.8;
 
-const DEFAULTS = {
+const DEFAULTS: PhysicsTune = {
   baseFriction: 0.08,
   pebbleFrictionBonus: 0.07,
   curlCoeff: 40,
@@ -43,7 +199,7 @@ const DEFAULTS = {
 // ============================================================
 // THEMES
 // ============================================================
-const THEMES = {
+const THEMES: Record<ThemeName, Theme> = {
   modern: {
     name: "Modern",
     // Page chrome
@@ -176,7 +332,32 @@ const THEMES = {
 // ============================================================
 // PERSPECTIVE RENDERER
 // ============================================================
-function drawPerspective(ctx, W, H, state) {
+
+interface PerspectiveState {
+  WORLD: World;
+  ROCK_RADIUS: number;
+  rocks: Rock[];
+  deliveryRock: Rock | null;
+  sweeping: boolean;
+  phase: GamePhase;
+  aimAngle: number;
+  currentTeam: number;
+  theme: Theme;
+}
+
+interface ProjResult {
+  sx: number;
+  sy: number;
+  sc: number;
+  d: number;
+}
+
+function drawPerspective(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  state: PerspectiveState,
+): void {
   const {
     WORLD: WD,
     ROCK_RADIUS: RR,
@@ -193,7 +374,7 @@ function drawPerspective(ctx, W, H, state) {
     fLen = W * 0.75,
     hrzY = H * 0.32,
     e = WD.sheetHalfWidth;
-  const proj = (wx, wy, wz = 0) => {
+  const proj = (wx: number, wy: number, wz = 0): ProjResult | null => {
     const d = camX - wx;
     if (d <= 0) return null;
     return {
@@ -249,7 +430,7 @@ function drawPerspective(ctx, W, H, state) {
       ctx.fill();
     }
   }
-  const dl3 = (wx, col, w) => {
+  const dl3 = (wx: number, col: string, w: number): void => {
     const l = proj(wx, -e),
       r = proj(wx, e);
     if (!l || !r) return;
@@ -347,11 +528,20 @@ function drawPerspective(ctx, W, H, state) {
       const p = proj(r.x, r.y, RR * 0.3);
       return p ? { rock: r, p } : null;
     })
-    .filter(Boolean)
+    .filter((x): x is { rock: Rock; p: ProjResult } => x !== null)
     .sort((a, b) => b.p.d - a.p.d);
 
   // Perspective-aware rock drawing - renders 3D rocks as viewed from hack
-  const drawRockPerspective = (ctx, rx, ry, rr, c, th, moving, scale) => {
+  const drawRockPerspective = (
+    ctx: CanvasRenderingContext2D,
+    rx: number,
+    ry: number,
+    rr: number,
+    c: Team,
+    th: Theme,
+    _moving: boolean,
+    scale: number,
+  ): void => {
     // Flattening factor - rocks appear more elliptical as they get farther
     const flat = 0.4; // vertical flattening for 3D perspective
     const height = rr * 0.25 * scale; // apparent height of rock above ice
@@ -394,12 +584,14 @@ function drawPerspective(ctx, W, H, state) {
 
   for (const { rock, p } of rd) {
     const rr = Math.max(2, p.sc * RR * 1.05);
+    const team = th.teams[rock.team];
+    if (!team) continue;
     drawRockPerspective(
       ctx,
       p.sx,
       p.sy,
       rr,
-      th.teams[rock.team],
+      team,
       th,
       rock.velocity > 0.1,
       p.sc,
@@ -456,7 +648,7 @@ function createCell(): Cell {
   };
 }
 
-function cellFriction(cell, bf, pb) {
+function cellFriction(cell: Cell, bf: number, pb: number): number {
   return Math.max(
     0.02,
     bf +
@@ -473,10 +665,10 @@ class IceGrid {
     this.cells = [];
     for (let c = 0; c < GRID_COLS; c++) {
       this.cells[c] = [];
-      for (let r = 0; r < GRID_ROWS; r++) this.cells[c][r] = createCell();
+      for (let r = 0; r < GRID_ROWS; r++) this.cells[c]![r] = createCell();
     }
   }
-  toGrid(wx, wy) {
+  toGrid(wx: number, wy: number): [number, number] {
     return [
       Math.max(
         0,
@@ -488,7 +680,7 @@ class IceGrid {
       ),
     ];
   }
-  _bilinear(wx, wy, fn) {
+  _bilinear(wx: number, wy: number, fn: (c: Cell) => number): number {
     const fx = (wx - GRID_X_MIN) / CELL_W - 0.5,
       fy = (wy - GRID_Y_MIN) / CELL_H - 0.5;
     const c0 = Math.max(0, Math.min(GRID_COLS - 2, Math.floor(fx))),
@@ -496,22 +688,22 @@ class IceGrid {
     const tx = Math.max(0, Math.min(1, fx - c0)),
       ty = Math.max(0, Math.min(1, fy - r0));
     return (
-      fn(this.cells[c0][r0]) * (1 - tx) * (1 - ty) +
-      fn(this.cells[c0 + 1][r0]) * tx * (1 - ty) +
-      fn(this.cells[c0][r0 + 1]) * (1 - tx) * ty +
-      fn(this.cells[c0 + 1][r0 + 1]) * tx * ty
+      fn(this.cells[c0]![r0]!) * (1 - tx) * (1 - ty) +
+      fn(this.cells[c0 + 1]![r0]!) * tx * (1 - ty) +
+      fn(this.cells[c0]![r0 + 1]!) * (1 - tx) * ty +
+      fn(this.cells[c0 + 1]![r0 + 1]!) * tx * ty
     );
   }
-  sampleFriction(wx, wy, bf, pb) {
+  sampleFriction(wx: number, wy: number, bf: number, pb: number): number {
     return this._bilinear(wx, wy, (c) => cellFriction(c, bf, pb));
   }
-  sampleSlope(wx, wy) {
+  sampleSlope(wx: number, wy: number): { sx: number; sy: number } {
     return {
       sx: this._bilinear(wx, wy, (c) => c.slopeX),
       sy: this._bilinear(wx, wy, (c) => c.slopeY),
     };
   }
-  applyWear(wx, wy, dt, isSweeping, wearRate) {
+  applyWear(wx: number, wy: number, dt: number, isSweeping: boolean, wearRate: number): void {
     const [c, r] = this.toGrid(wx, wy);
     for (let dc = -1; dc <= 1; dc++)
       for (let dr = -1; dr <= 1; dr++) {
@@ -519,7 +711,7 @@ class IceGrid {
           rr = r + dr;
         if (cc < 0 || cc >= GRID_COLS || rr < 0 || rr >= GRID_ROWS) continue;
         const w = dc === 0 && dr === 0 ? 1.0 : 0.3,
-          cell = this.cells[cc][rr];
+          cell = this.cells[cc]![rr]!;
         cell.pebbleHeight = Math.max(0, cell.pebbleHeight - wearRate * w * dt);
         if (isSweeping) {
           cell.pebbleHeight = Math.max(
@@ -530,17 +722,17 @@ class IceGrid {
         }
       }
   }
-  evaporateMoisture(dt) {
+  evaporateMoisture(dt: number): void {
     for (let c = 0; c < GRID_COLS; c++)
       for (let r = 0; r < GRID_ROWS; r++) {
-        const cell = this.cells[c][r];
+        const cell = this.cells[c]![r]!;
         if (cell.moisture > 0)
           cell.moisture = Math.max(0, cell.moisture - 0.008 * dt);
       }
   }
 }
 
-const ICE_PROFILES = {
+const ICE_PROFILES: Record<IceProfileKey, IceProfile> = {
   championship: {
     name: "Championship",
     desc: "Flat, consistent, fresh pebble.",
@@ -549,10 +741,10 @@ const ICE_PROFILES = {
   club: {
     name: "Club Ice",
     desc: "Slight dish, mild center wear.",
-    init: (grid) => {
+    init: (grid: IceGrid) => {
       for (let c = 0; c < GRID_COLS; c++)
         for (let r = 0; r < GRID_ROWS; r++) {
-          const cell = grid.cells[c][r];
+          const cell = grid.cells[c]![r]!;
           const yN = (r - GRID_ROWS / 2) / (GRID_ROWS / 2);
           cell.slopeY = -yN * 0.0012;
           if (Math.abs(yN) < 0.3)
@@ -563,10 +755,10 @@ const ICE_PROFILES = {
   arena: {
     name: "Arena",
     desc: "Cold ice, brine trough, corner slope.",
-    init: (grid) => {
+    init: (grid: IceGrid) => {
       for (let c = 0; c < GRID_COLS; c++)
         for (let r = 0; r < GRID_ROWS; r++) {
-          const cell = grid.cells[c][r];
+          const cell = grid.cells[c]![r]!;
           cell.temperature = -1.5;
           const yW = GRID_Y_MIN + (r + 0.5) * CELL_H,
             xW = GRID_X_MIN + (c + 0.5) * CELL_W;
@@ -585,10 +777,10 @@ const ICE_PROFILES = {
   swingy: {
     name: "Swingy",
     desc: "Heavy dish, thick pebble, big curl.",
-    init: (grid) => {
+    init: (grid: IceGrid) => {
       for (let c = 0; c < GRID_COLS; c++)
         for (let r = 0; r < GRID_ROWS; r++) {
-          const cell = grid.cells[c][r];
+          const cell = grid.cells[c]![r]!;
           const yN = (r - GRID_ROWS / 2) / (GRID_ROWS / 2);
           cell.slopeY = -yN * 0.003;
           cell.pebbleHeight = 1.2;
@@ -598,7 +790,7 @@ const ICE_PROFILES = {
   discovery: {
     name: "Discovery",
     desc: "Random hidden features.",
-    init: (grid) => {
+    init: (grid: IceGrid) => {
       const R = Math.random;
       const dish = (R() - 0.3) * 0.003;
       const tY = (R() - 0.5) * 130,
@@ -613,7 +805,7 @@ const ICE_PROFILES = {
         wAmt = 0.05 + R() * 0.2;
       for (let c = 0; c < GRID_COLS; c++)
         for (let r = 0; r < GRID_ROWS; r++) {
-          const cell = grid.cells[c][r];
+          const cell = grid.cells[c]![r]!;
           const xW = GRID_X_MIN + (c + 0.5) * CELL_W,
             yW = GRID_Y_MIN + (r + 0.5) * CELL_H;
           const yN = (r - GRID_ROWS / 2) / (GRID_ROWS / 2);
@@ -640,7 +832,7 @@ const ICE_PROFILES = {
   },
 };
 
-function createRock(team, id) {
+function createRock(team: number, id: number): Rock {
   return {
     id,
     team,
@@ -669,7 +861,17 @@ function createRock(team, id) {
   };
 }
 
-function Slider({ label, value, min, max, step, onChange, theme: th }) {
+interface SliderProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  theme: Theme;
+}
+
+function Slider({ label, value, min, max, step, onChange, theme: th }: SliderProps): React.ReactElement {
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}
@@ -715,36 +917,36 @@ function Slider({ label, value, min, max, step, onChange, theme: th }) {
 }
 
 export default function CurlingGame() {
-  const canvasRef = useRef(null),
-    perspCanvasRef = useRef(null),
-    animRef = useRef(null),
-    iceGridRef = useRef(new IceGrid());
-  const [phase, setPhase] = useState("title");
+  const canvasRef = useRef<HTMLCanvasElement>(null),
+    perspCanvasRef = useRef<HTMLCanvasElement>(null),
+    animRef = useRef<number | null>(null),
+    iceGridRef = useRef<IceGrid>(new IceGrid());
+  const [phase, setPhase] = useState<GamePhase>("title");
   const [currentEnd, setCurrentEnd] = useState(1);
   const [totalEnds] = useState(8);
   const [currentTeam, setCurrentTeam] = useState(0);
   const [rockNum, setRockNum] = useState(0);
-  const [scores, setScores] = useState([[], []]);
-  const [endScoreDisplay, setEndScoreDisplay] = useState(null);
+  const [scores, setScores] = useState<number[][]>([[], []]);
+  const [endScoreDisplay, setEndScoreDisplay] = useState<EndScore | null>(null);
   const [aimAngle, setAimAngle] = useState(0);
   const [power, setPower] = useState(0);
   const [curlDir, setCurlDir] = useState(1);
   // Vertical-only mode - horizontal mode removed
   const [isNarrowLayout, setIsNarrowLayout] = useState(true);
-  const [iceProfile, setIceProfile] = useState("club");
+  const [iceProfile, setIceProfile] = useState<IceProfileKey>("club");
   const [showOverlay, setShowOverlay] = useState(false);
   const [showProfilePicker, setShowProfilePicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
-  const [themeName, setThemeName] = useState("modern");
+  const [themeName, setThemeName] = useState<ThemeName>("modern");
   const theme = THEMES[themeName] || THEMES.modern;
-  const [tune, setTune] = useState({ ...DEFAULTS });
-  const setT = (key, val) => setTune((prev) => ({ ...prev, [key]: val }));
-  const rocksRef = useRef([]),
-    deliveryRockRef = useRef(null),
+  const [tune, setTune] = useState<PhysicsTune>({ ...DEFAULTS });
+  const setT = (key: keyof PhysicsTune, val: number) => setTune((prev) => ({ ...prev, [key]: val }));
+  const rocksRef = useRef<Rock[]>([]),
+    deliveryRockRef = useRef<Rock | null>(null),
     sweepingRef = useRef(false);
 
-  const initIce = useCallback((pk) => {
+  const initIce = useCallback((pk: IceProfileKey) => {
     const g = new IceGrid();
     ICE_PROFILES[pk]?.init(g);
     iceGridRef.current = g;
@@ -760,13 +962,13 @@ export default function CurlingGame() {
       }
   }, []);
 
-  const resolveCollisions = useCallback((rocks) => {
+  const resolveCollisions = useCallback((rocks: Rock[]) => {
     for (let i = 0; i < rocks.length; i++) {
-      const a = rocks[i];
+      const a = rocks[i]!;
       if (!a.inPlay || a.velocity <= 0.05) continue;
       for (let j = 0; j < rocks.length; j++) {
         if (i === j) continue;
-        const b = rocks[j];
+        const b = rocks[j]!;
         if (!b.inPlay) continue;
         const dx = a.x - b.x,
           dy = a.y - b.y,
@@ -805,7 +1007,7 @@ export default function CurlingGame() {
     }
   }, []);
 
-  const removeRock = (rock) => {
+  const removeRock = (rock: Rock): void => {
     rock.inPlay = false;
     rock.active = false;
     rock.velocity = 0;
@@ -813,7 +1015,7 @@ export default function CurlingGame() {
   };
 
   const physicsTick = useCallback(
-    (dt) => {
+    (dt: number): boolean => {
       const rocks = rocksRef.current,
         grid = iceGridRef.current,
         T = tune;
@@ -903,33 +1105,33 @@ export default function CurlingGame() {
     [resolveCollisions, tune],
   );
 
-  const scoreEnd = useCallback(() => {
+  const scoreEnd = useCallback((): EndScore => {
     const rocks = rocksRef.current.filter((r) => r.inPlay),
       hx = WORLD.houseCenter.x,
       hy = WORLD.houseCenter.y,
       maxR = WORLD.houseRadii[3] + ROCK_RADIUS;
-    const dists = [[], []];
+    const dists: [number[], number[]] = [[], []];
     for (const r of rocks) {
       const d = Math.sqrt((r.x - hx) ** 2 + (r.y - hy) ** 2);
-      if (d <= maxR) dists[r.team].push(d);
+      if (d <= maxR) dists[r.team]!.push(d);
     }
-    dists[0].sort((a, b) => a - b);
-    dists[1].sort((a, b) => a - b);
+    dists[0]!.sort((a, b) => a - b);
+    dists[1]!.sort((a, b) => a - b);
     let sT = -1,
       pts = 0;
-    if (!dists[0].length && !dists[1].length) {
-    } else if (!dists[1].length) {
+    if (!dists[0]!.length && !dists[1]!.length) {
+    } else if (!dists[1]!.length) {
       sT = 0;
-      pts = dists[0].length;
-    } else if (!dists[0].length) {
+      pts = dists[0]!.length;
+    } else if (!dists[0]!.length) {
       sT = 1;
-      pts = dists[1].length;
-    } else if (dists[0][0] < dists[1][0]) {
+      pts = dists[1]!.length;
+    } else if (dists[0]![0]! < dists[1]![0]!) {
       sT = 0;
-      pts = dists[0].filter((d) => d < dists[1][0]).length;
+      pts = dists[0]!.filter((d) => d < dists[1]![0]!).length;
     } else {
       sT = 1;
-      pts = dists[1].filter((d) => d < dists[0][0]).length;
+      pts = dists[1]!.filter((d) => d < dists[0]![0]!).length;
     }
     return { scoringTeam: sT, pts };
   }, []);
@@ -957,7 +1159,7 @@ export default function CurlingGame() {
   useEffect(() => {
     if (phase !== "running") return;
     let last = performance.now();
-    const loop = (now) => {
+    const loop = (now: number): void => {
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
       if (!physicsTick(dt)) {
@@ -968,13 +1170,13 @@ export default function CurlingGame() {
           const res = scoreEnd();
           setEndScoreDisplay(res);
           setScores((prev) => {
-            const n = [prev[0].slice(), prev[1].slice()];
+            const n: [number[], number[]] = [prev[0]?.slice() ?? [], prev[1]?.slice() ?? []];
             if (res.scoringTeam >= 0) {
-              n[res.scoringTeam].push(res.pts);
-              n[1 - res.scoringTeam].push(0);
+              n[res.scoringTeam]!.push(res.pts);
+              n[1 - res.scoringTeam]!.push(0);
             } else {
-              n[0].push(0);
-              n[1].push(0);
+              n[0]!.push(0);
+              n[1]!.push(0);
             }
             return n;
           });
@@ -991,7 +1193,11 @@ export default function CurlingGame() {
       animRef.current = requestAnimationFrame(loop);
     };
     animRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animRef.current);
+    return () => {
+      if (animRef.current !== null) {
+        cancelAnimationFrame(animRef.current);
+      }
+    };
   }, [phase, physicsTick, rockNum, scoreEnd]);
 
   useEffect(() => {
@@ -1034,7 +1240,8 @@ export default function CurlingGame() {
     if (!canvas || !perspCanvas) return;
     const ctx = canvas.getContext("2d");
     const perspCtx = perspCanvas.getContext("2d");
-    let raf;
+    if (!ctx || !perspCtx) return;
+    let raf: number | undefined;
     const W = canvas.width,
       H = canvas.height,
       // Hardcoded vertical mode: world +y goes to right (screen +x)
@@ -1046,23 +1253,25 @@ export default function CurlingGame() {
       (W * 0.92) / yRange,
     );
     const wcx = (WORLD.sheetStart + WORLD.sheetEnd) / 2;
-    const toS = (wx, wy) => [W / 2 + wy * uScale, H / 2 + (wx - wcx) * uScale];
-    const r2s = (wr) => wr * uScale;
+    const toS = (wx: number, wy: number): [number, number] => [W / 2 + wy * uScale, H / 2 + (wx - wcx) * uScale];
+    const r2s = (wr: number): number => wr * uScale;
     const T = tune,
       grid = iceGridRef.current;
     // World +y force → screen delta. Vert: +y → right (screen +x).
-    const fToS = (fy, sc) => [fy * sc, 0];
+    const fToS = (fy: number, sc: number): [number, number] => [fy * sc, 0];
 
     const buildOverlay = () => {
       const oc = document.createElement("canvas");
       oc.width = GRID_COLS;
       oc.height = GRID_ROWS;
-      const octx = oc.getContext("2d"),
-        id = octx.createImageData(GRID_COLS, GRID_ROWS);
+      const octx = oc.getContext("2d");
+      if (!octx) return oc;
+      const id = octx.createImageData(GRID_COLS, GRID_ROWS);
       for (let c = 0; c < GRID_COLS; c++)
         for (let r = 0; r < GRID_ROWS; r++) {
-          const cell = grid.cells[c][r],
-            idx = (r * GRID_COLS + c) * 4;
+          const cell = grid.cells[c]?.[r];
+          if (!cell) continue;
+          const idx = (r * GRID_COLS + c) * 4;
           const wear = 1 - Math.max(0, Math.min(1, cell.pebbleHeight));
           const fric = cellFriction(
             cell,
@@ -1089,7 +1298,7 @@ export default function CurlingGame() {
       return oc;
     };
 
-    const drawArrow = (sx, sy, dx, dy, color, label) => {
+    const drawArrow = (sx: number, sy: number, dx: number, dy: number, color: string, label?: string): void => {
       const len = Math.sqrt(dx * dx + dy * dy);
       if (len < 0.3) return;
       ctx.strokeStyle = color;
@@ -1155,7 +1364,8 @@ export default function CurlingGame() {
       if (showOverlay) {
         for (let c = 0; c < GRID_COLS; c += 3)
           for (let r = 0; r < GRID_ROWS; r += 3) {
-            const cell = grid.cells[c][r];
+            const cell = grid.cells[c]?.[r];
+            if (!cell) continue;
             const mag = Math.sqrt(cell.slopeX ** 2 + cell.slopeY ** 2);
             if (mag < 0.0003) continue;
             const wx = GRID_X_MIN + (c + 0.5) * CELL_W,
@@ -1194,7 +1404,7 @@ export default function CurlingGame() {
         ctx.fill();
       }
 
-      const drawWL = (wx, color, w) => {
+      const drawWL = (wx: number, color: string, w: number): void => {
         const [x1, y1] = toS(wx, -e),
           [x2, y2] = toS(wx, e);
         ctx.strokeStyle = color;
@@ -1253,6 +1463,7 @@ export default function CurlingGame() {
         const [rx, ry] = toS(rock.x, rock.y);
         const rr = r2s(ROCK_RADIUS) * 1.05;
         const c = tcA[rock.team];
+        if (!c) continue;
         if (rock.velocity > 0.1) {
           ctx.fillStyle = c.g;
           ctx.beginPath();
@@ -1353,6 +1564,8 @@ export default function CurlingGame() {
       }
 
       for (let t = 0; t < 2; t++) {
+        const teamColors = tcA[t];
+        if (!teamColors) continue;
         const rem = rocksRef.current.filter(
           (r) => r.team === t && !r.inPlay && r.x >= 200,
         ).length;
@@ -1360,8 +1573,8 @@ export default function CurlingGame() {
           const py = (t === 0 ? -1 : 1) * (e + 10 + i * ROCK_RADIUS * 2.4);
           const [px, py2] = toS(WORLD.hackPos + 30, py);
           const pr = r2s(ROCK_RADIUS) * 0.6;
-          ctx.fillStyle = tcA[t].f + "45";
-          ctx.strokeStyle = tcA[t].s + "25";
+          ctx.fillStyle = teamColors.f + "45";
+          ctx.strokeStyle = teamColors.s + "25";
           ctx.lineWidth = 0.6;
           ctx.beginPath();
           ctx.arc(px, py2, pr, 0, PI * 2);
@@ -1491,7 +1704,11 @@ export default function CurlingGame() {
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      if (raf !== undefined) {
+        cancelAnimationFrame(raf);
+      }
+    };
   }, [
     phase,
     aimAngle,
@@ -1533,7 +1750,7 @@ export default function CurlingGame() {
       else {
         setCurrentEnd((e) => e + 1);
         const nf =
-          endScoreDisplay?.scoringTeam >= 0
+          endScoreDisplay && endScoreDisplay.scoringTeam >= 0
             ? endScoreDisplay.scoringTeam
             : currentTeam;
         setCurrentTeam(nf);
@@ -1562,13 +1779,13 @@ export default function CurlingGame() {
     currentTeam,
   ]);
 
-  const totalScore = (t) => scores[t].reduce((a, b) => a + b, 0);
-  const tn = (t) => theme.teams[t].name;
-  const tCol = (t) => theme.teams[t].f;
+  const totalScore = (t: number): number => scores[t]?.reduce((a, b) => a + b, 0) ?? 0;
+  const tn = (t: number): string => theme.teams[t]?.name ?? "";
+  const tCol = (t: number): string => theme.teams[t]?.f ?? "";
   // Main canvas dimensions (top-down minimap)
-  const [dims, setDims] = useState({ w: 900, h: 500 });
+  const [dims, setDims] = useState<Dimensions>({ w: 900, h: 500 });
   // Perspective canvas dimensions - grows to fill available space
-  const [perspDims, setPerspDims] = useState({ w: 400, h: 400 });
+  const [perspDims, setPerspDims] = useState<Dimensions>({ w: 400, h: 400 });
 
   // Sheet aspect ratio (width:height ratio for the ice sheet)
   const SHEET_ASPECT = (WORLD.sheetStart - WORLD.sheetEnd) / (WORLD.sheetHalfWidth * 2);
@@ -1721,7 +1938,7 @@ export default function CurlingGame() {
             <button
               key={k}
               onClick={() => {
-                setIceProfile(k);
+                setIceProfile(k as IceProfileKey);
                 setShowProfilePicker(false);
               }}
               style={{
@@ -1908,7 +2125,7 @@ export default function CurlingGame() {
                 {tn(t)}
               </span>
               <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-                {scores[t].map((s, i) => (
+                {(scores[t] ?? []).map((s, i) => (
                   <span
                     key={i}
                     style={{
