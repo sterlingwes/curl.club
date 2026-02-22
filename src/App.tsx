@@ -174,76 +174,6 @@ const THEMES = {
 };
 
 // ============================================================
-// SHARED DRAWING UTILS
-// ============================================================
-function drawHouseRings(ctx, cx, cy, r2s, th) {
-  th.houseRings.forEach(([r, f, s, lw]) => {
-    ctx.fillStyle = f;
-    ctx.strokeStyle = s;
-    ctx.lineWidth = lw;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r2s(r), 0, PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  });
-  ctx.fillStyle = th.buttonFill;
-  ctx.beginPath();
-  ctx.arc(cx, cy, Math.max(2, r2s(1.2)), 0, PI * 2);
-  ctx.fill();
-  if (th.houseCrosshairs) {
-    const cr = r2s(75);
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(cx - cr, cy);
-    ctx.lineTo(cx + cr, cy);
-    ctx.moveTo(cx, cy - cr);
-    ctx.lineTo(cx, cy + cr);
-    ctx.stroke();
-  }
-}
-
-function drawRockFn(ctx, rx, ry, rr, c, th, moving) {
-  if (moving) {
-    ctx.fillStyle = c.g;
-    ctx.beginPath();
-    ctx.arc(rx, ry, rr + 3, 0, PI * 2);
-    ctx.fill();
-  }
-  ctx.fillStyle = "rgba(0,0,0,0.12)";
-  ctx.beginPath();
-  ctx.arc(rx + 1, ry + 1, rr, 0, PI * 2);
-  ctx.fill();
-  if (th.rockGradient) {
-    const rg = ctx.createRadialGradient(
-      rx - rr * 0.3,
-      ry - rr * 0.3,
-      rr * 0.1,
-      rx,
-      ry,
-      rr,
-    );
-    rg.addColorStop(0, "#fff");
-    rg.addColorStop(0.35, c.f);
-    rg.addColorStop(1, c.s);
-    ctx.fillStyle = rg;
-  } else {
-    ctx.fillStyle = c.f;
-  }
-  ctx.strokeStyle = c.s;
-  ctx.lineWidth = th.rockGradient ? 1 : 2;
-  ctx.beginPath();
-  ctx.arc(rx, ry, rr, 0, PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = th.rockStroke;
-  ctx.lineWidth = th.rockHandleWidth;
-  ctx.beginPath();
-  ctx.arc(rx, ry, rr * 0.4, 0, PI * 2);
-  ctx.stroke();
-}
-
-// ============================================================
 // PERSPECTIVE RENDERER
 // ============================================================
 function drawPerspective(ctx, W, H, state) {
@@ -505,71 +435,18 @@ function drawPerspective(ctx, W, H, state) {
 }
 
 // ============================================================
-// HOUSE ZOOM RENDERER
+// CELL AND ICE GRID
 // ============================================================
-function drawHouseZoom(ctx, W, H, state) {
-  const { WORLD: WD, ROCK_RADIUS: RR, rocks, theme: th } = state;
-  ctx.fillStyle = th.canvasBg;
-  ctx.fillRect(0, 0, W, H);
-  const vr = WD.houseRadii[3] + RR * 2 + 10,
-    sc = (Math.min(W, H) * 0.46) / vr,
-    cx = W / 2,
-    cy = H / 2;
-  const toS = (wx, wy) => [
-    cx + (wy - WD.houseCenter.y) * sc,
-    cy - (wx - WD.houseCenter.x) * sc,
-  ];
-  const r2s = (wr) => wr * sc;
-  ctx.fillStyle = th.sheetGradient[1];
-  ctx.fillRect(0, 0, W, H);
-  const e2 = WD.sheetHalfWidth;
-  const drawL = (wx, col, w) => {
-    const [x1, y1] = toS(wx, -e2),
-      [x2, y2] = toS(wx, e2);
-    ctx.strokeStyle = col;
-    ctx.lineWidth = w;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-  };
-  drawL(WD.tLine, th.tLine, th.lineWidth.tee);
-  drawL(WD.backLine, th.backLine, th.lineWidth.back);
-  ctx.strokeStyle = th.centerLine;
-  ctx.lineWidth = 1;
-  const [c1x, c1y] = toS(WD.houseCenter.x + vr, 0),
-    [c2x, c2y] = toS(WD.houseCenter.x - vr, 0);
-  ctx.beginPath();
-  ctx.moveTo(c1x, c1y);
-  ctx.lineTo(c2x, c2y);
-  ctx.stroke();
-  const [hcx, hcy] = toS(WD.houseCenter.x, WD.houseCenter.y);
-  drawHouseRings(ctx, hcx, hcy, r2s, th);
-  const maxD = vr + RR;
-  for (const rock of rocks) {
-    if (!rock.inPlay) continue;
-    const dx = rock.x - WD.houseCenter.x,
-      dy = rock.y - WD.houseCenter.y;
-    if (Math.sqrt(dx * dx + dy * dy) > maxD) continue;
-    const [rx, ry] = toS(rock.x, rock.y);
-    drawRockFn(
-      ctx,
-      rx,
-      ry,
-      r2s(RR) * 1.05,
-      th.teams[rock.team],
-      th,
-      rock.velocity > 0.1,
-    );
-  }
-  ctx.font = "bold 8px " + th.font;
-  ctx.fillStyle = th.dimText;
-  ctx.textAlign = "center";
-  ctx.fillText("HOUSE", W / 2, H - 4);
-  ctx.textAlign = "start";
+
+interface Cell {
+  pebbleHeight: number;
+  temperature: number;
+  moisture: number;
+  slopeX: number;
+  slopeY: number;
 }
 
-function createCell() {
+function createCell(): Cell {
   return {
     pebbleHeight: 1.0,
     temperature: 0,
@@ -590,6 +467,8 @@ function cellFriction(cell, bf, pb) {
 }
 
 class IceGrid {
+  cells: Cell[][];
+
   constructor() {
     this.cells = [];
     for (let c = 0; c < GRID_COLS; c++) {

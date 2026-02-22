@@ -1,0 +1,44 @@
+{
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn",
+    "style": "warn",
+    "restriction": "error"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "build", "*.config.*", "*.d.ts"],
+  "javascript": {
+    "target": "ES2022",
+    "jsx": true
+  },
+  "typescript": {
+    "target": "ES2022"
+  },
+  "rules": {
+    "no-console": "off",
+    "no-debugger": "error",
+    "no-alert": "warn",
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-empty": "error",
+    "no-undef-init": "error",
+    "no-duplicate-imports": "error",
+    "no-unused-vars": "error",
+    "no-const-assign": "error",
+    "no-self-compare": "error",
+    "no-duplicate-keys": "error",
+    "no-empty-character-class": "error",
+    "no-empty-pattern": "error",
+    "no-excessive-complexity": "warn",
+    "no-for-loop": "off",
+    "no-regex-spaces": "error",
+    "no-useless-concat": "warn",
+    "eqeqeq": "error",
+    "no-eq-null": "warn",
+    "no-unsafe-negation": "error",
+    "use-isnan": "error",
+    "no-use-type-alias": "off",
+    "use-isfinite": "error"
+  }
+}
