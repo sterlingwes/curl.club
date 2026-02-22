@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
+    "test:snapshots": "node tests/run-snapshots.js",
     "test:run": "vitest run",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",

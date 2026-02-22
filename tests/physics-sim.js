@@ -214,4 +214,4 @@ function simulate(opts) {
   return { trace, summary };
 }
 
-module.exports = { simulate, WORLD, ROCK_RADIUS, DEFAULTS, ICE_PROFILES };
+export { simulate, WORLD, ROCK_RADIUS, DEFAULTS, ICE_PROFILES };

@@ -12,8 +12,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  typechecks:
-    name: Run typechecks
+  checks:
+    name: Run static checks
     runs-on: ubuntu-latest
 
     steps:
@@ -23,8 +23,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Run snapshot tests
-        run: node tests/run-snapshots.js
+      - name: Run typechecks
+        run: npm run typecheck
+
+      - name: Run lintchecks
+        run: npm run lint
 
   snapshots:
     name: Run physics snapshots
@@ -38,7 +41,7 @@ jobs:
           node-version: "20"
 
       - name: Run snapshot tests
-        run: node tests/run-snapshots.js
+        run: npm run test:snapshots
 
       - name: Upload snapshot SVGs
         if: always()

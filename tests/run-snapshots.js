@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 // run-snapshots.js — Run all scenarios, generate SVGs + JSON, validate expectations
 
-const fs = require("fs");
-const path = require("path");
-const { simulate, WORLD, ROCK_RADIUS } = require("./physics-sim");
-const scenarios = require("./scenarios");
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { simulate, WORLD, ROCK_RADIUS } from "./physics-sim.js";
+import scenarios from "./scenarios.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const SNAP_DIR = path.join(__dirname, "snapshots");
 if (!fs.existsSync(SNAP_DIR)) fs.mkdirSync(SNAP_DIR, { recursive: true });
 

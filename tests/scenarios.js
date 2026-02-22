@@ -4,7 +4,7 @@
 // Expectations are ranges, not exact values — they catch regressions
 // (sign flips, broken deceleration, etc.) without being brittle.
 
-module.exports = [
+export default [
   // ============================================================
   // CURL DIRECTION — the most important thing to get right
   // ============================================================
