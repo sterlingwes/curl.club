@@ -2,6 +2,7 @@
 
 import type { World } from "../constants/world";
 import type { Theme } from "../constants/theme";
+import type { PhysicsTune } from "../constants/physics";
 import type { IceGrid } from "../ice/grid";
 
 // Game phase states
@@ -84,4 +85,19 @@ export interface ProjResult {
   sy: number;
   sc: number;
   d: number;
+}
+
+// Render state for overhead view
+export interface OverheadState {
+  WORLD: World;
+  ROCK_RADIUS: number;
+  rocks: Rock[];
+  phase: GamePhase;
+  aimAngle: number;
+  currentTeam: number;
+  theme: Theme;
+  showOverlay: boolean;
+  showDebug: boolean;
+  tune: PhysicsTune;
+  grid: IceGrid;
 }
