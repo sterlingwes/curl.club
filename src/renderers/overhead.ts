@@ -103,16 +103,34 @@ export function drawOverhead(
   } = state;
 
   // Coordinate transformation
+  // - World Y (sheet width) maps to screen X (horizontal)
+  // - World X (sheet length) maps to screen Y (vertical)
+  // - Define a viewing area and scale to fit it in the canvas
   const e = WD.sheetHalfWidth;
-  const yRange = e * 2;
-  const uScale = (W * 0.95) / yRange;
-  const wcx = WD.houseCenter.x;
-  const wcy = 0;
+  const sheetWidth = e * 2; // 164 world units
+
+  // Define viewing area: from back line to near hack
+  // This ensures we always see the house and a good portion of the sheet
+  const viewTop = WD.backLine - 10; // -622 (slightly above back line)
+  const viewBottom = WD.hackPos + 50; // -50 (past hack towards sheet start)
+  const viewHeight = viewBottom - viewTop; // ~572 world units
+
+  // Calculate scale to fit viewing area while maintaining aspect ratio
+  // Use the smaller scale to ensure the entire viewing area fits
+  const scaleX = (W * 0.98) / sheetWidth;
+  const scaleY = (H * 0.98) / viewHeight;
+  const scale = Math.min(scaleX, scaleY);
+
+  // Center the view in the canvas
+  const actualWidth = sheetWidth * scale;
+  const actualHeight = viewHeight * scale;
+  const offsetX = (W - actualWidth) / 2;
+  const offsetY = (H - actualHeight) / 2;
 
   // World to screen coordinate conversion
   const toS = (wx: number, wy: number): [number, number] =>
-    [W / 2 + (wy - wcy) * uScale, H / 2 + (wx - wcx) * uScale];
-  const r2s = (wr: number): number => wr * uScale;
+    [offsetX + (wy + e) * scale, offsetY + (wx - viewTop) * scale];
+  const r2s = (wr: number): number => wr * scale;
 
   // Clear canvas
   ctx.fillStyle = th.canvasBg;
@@ -125,19 +143,23 @@ export function drawOverhead(
   ig.addColorStop(1, th.sheetGradient[2]!);
   ctx.fillStyle = ig;
 
-  const [left, top] = toS(WD.sheetStart, -e);
-  const [right, bottom] = toS(WD.sheetEnd, e);
-  const sheetW = right - left;
-  const sheetH = bottom - top;
+  // Calculate sheet corners in screen coordinates
+  // Note: world X increases towards hack, screen Y increases downward
+  // So sheetStart (hack end, high X) maps to high screen Y (bottom)
+  // And sheetEnd (back line end, low X) maps to low screen Y (top)
+  const [sheetLeft, sheetBottom] = toS(WD.sheetStart, -e);  // hack end, left side
+  const [sheetRight, sheetTop] = toS(WD.sheetEnd, e);       // back line end, right side
+  const sheetW = sheetRight - sheetLeft;
+  const sheetH = sheetBottom - sheetTop;
   ctx.beginPath();
-  ctx.roundRect(left, top, sheetW, sheetH, th.sheetRadius);
+  ctx.roundRect(sheetLeft, sheetTop, sheetW, sheetH, th.sheetRadius);
   ctx.fill();
 
   // Draw pebble dots
   ctx.fillStyle = th.pebbleDots;
   for (let i = 0; i < 800; i++) {
-    const px = left + Math.random() * sheetW;
-    const py = top + Math.random() * sheetH;
+    const px = sheetLeft + Math.random() * sheetW;
+    const py = sheetTop + Math.random() * sheetH;
     ctx.fillRect(px, py, 1, 1);
   }
 
@@ -145,7 +167,7 @@ export function drawOverhead(
   if (showOverlay || showDebug) {
     const overlay = buildOverlay(grid, tune, showOverlay);
     ctx.globalAlpha = 0.4;
-    ctx.drawImage(overlay, left, top, sheetW, sheetH);
+    ctx.drawImage(overlay, sheetLeft, sheetTop, sheetW, sheetH);
     ctx.globalAlpha = 1;
   }
 
